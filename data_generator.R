@@ -2,7 +2,7 @@ library ("signal")
 library ("seewave")
 
 ########################################################################
-data_generator = function (fs, duration, wvf=NULL, ampl=1, fcut=15, actPlot=TRUE){
+data_generator = function (fs, duration, wvf.df=NULL, ampl=1, fcut=15, actPlot=TRUE){
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
@@ -22,7 +22,7 @@ data_generator = function (fs, duration, wvf=NULL, ampl=1, fcut=15, actPlot=TRUE
   wvf_opt=0
 
   # Prepration in case a signal is added  
-  if (length(wvf)!=1) {
+  if (length(wvf.df)!=1) {
     wvf_opt=1
     wvf_size=length(wvf.df$V2)
     if (wvf_size>n){
