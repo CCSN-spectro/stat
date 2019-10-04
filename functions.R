@@ -516,7 +516,8 @@ pdgrm = function(data, ylog = TRUE, main = NULL, ...){
 ##########################
 
 covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11, 
-                       um = 3, dm = 3, movBand = 5, timeGmode = NULL){
+                       um = 3, dm = 3, movBand = 5, timeGmode = NULL,
+                       Obergaunlinguer_data, actPlot = FALSE, fmean = 0){
   
   # The only difference with 'covpbb' function is how the predicted 
   #  values are calculated.
@@ -530,6 +531,11 @@ covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11,
   # dm       : define lower neighborhood to find g-modes
   # movBand  : define the number of points to smooth the band
   # timeGMode: time interval to define g-modes
+  # Oberganlinger_data: simulated R and M time evolution
+  # fmean: mean of frequencies used to generate the model
+  
+  # Compute true ratios
+  true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2));
   
   # spectrogram
   r = specPdgrm(data$V2, data$V1, l = l, p = p, fs = fs, actPlot = FALSE, logPow = T,
@@ -572,35 +578,40 @@ covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11,
   maxf = findGmodes(r, um=um, dm=dm);
   maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
   
-  # Linear model to predict ratios
-  f = function(vec, x){
-    
-    return(sum(vec * c(x, x^2, x^3))); # Linear model
-    
-  }
+  cmaxf = maxf - fmean; # centred g-modes (SEE MODEL USED IN JAGS)
   
-  # prediction
-  aux  = as.matrix(postSamples[,1:3]) %*% t(cbind(maxf, maxf^2, maxf^3));
+  xs =  rbind(rep(1, length = length(cmaxf)), cmaxf, cmaxf^2, cmaxf^3); 
   
-  aux1 = apply(aux,2,median);
+  # postSamples = (a0, a1, a2, a3, b1); # postSample structure
+  postSamples = as.matrix(postSamples); # needed for matrix operations below
   
-  sdb  = 1.96 * sqrt(maxf * median(postSamples[,4]));
+  # a0+ a1*(fnew[i]-mean(f))+a2*(fnew[i]-mean(f))^2+a3*(fnew[i]-mean(f))^3
+  mus = postSamples[,1:4] %*% xs; # means
   
-  pred = cbind(aux1 - sdb, aux1 + sdb);
+  # standard deviations
+  sds = as.matrix(postSamples[,5], ncol=1) %*% t(as.matrix(maxf,ncol=1));
+  sds = sqrt(sds);
   
-  #pred = t(apply(aux, 2, function(x) quantile(x, probs = c(0.025, 0.975))));
+  # simulation from Normal(mus, sds)
+  n_maxf = length(maxf);
+  X      = apply(cbind(mus, sds), 1, function(x)
+    rnorm(n_maxf, mean = x[1:n_maxf], sd = x[-(1:n_maxf)]));
+  X      = t(X);
+  
+  # median, quantiles 0.025 & 0.975
+  pred = apply(X, 2, function(x) quantile(x ,probs = c(0.5,0.025,0.975)));
+  pred = t(pred);
   
   #pred[pred[,2] < 0, 2] = 0; # discarding negative values in CI
   
   ### generating band function ### 
-  # n = 1 is equal to system defined above
   
   # interpolating lower bound for predicted values
-  fd = approxfun(x = timefreq, y = movf(pred[,1],n=movBand,median), method = "linear",
-                 yleft = NA, yright = NA, rule = 1, f = 0, ties = mean);
+  fd = approxfun(x = timefreq, y = movf(pred[,2],n=movBand,median), method = "linear",
+                 yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
   # interpolating upper bound for predicted values
-  fu = approxfun(x = timefreq, y = movf(pred[,2],n=movBand,median), method = "linear",
-                 yleft = NA, yright = NA, rule = 1, f = 0, ties = mean);
+  fu = approxfun(x = timefreq, y = movf(pred[,3],n=movBand,median), method = "linear",
+                 yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
   
   # fd & fu use smooth confidence intervals by using "movf"
   
@@ -624,11 +635,11 @@ covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11,
   }
   
   out = NULL;
-
+  
   if( !is.null(timeGmode)){
-
+    
     # To test only true values inside g-mode time range
-
+    
     out = apply(as.matrix(trueRatioTime), 1,
                 function(x){
                   if((x >= timeGmode[1]) & (x <= timeGmode[2])){
@@ -637,9 +648,26 @@ covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11,
                     return(FALSE);
                   }
                 });
-
+    
     aux = aux[out, ];
-
+    
+  }
+  
+  if(actPlot == TRUE){
+    
+    plot(Obergaunlinguer_data$time, true_ratios, 
+         ylim=c(min(pred[,2]),max(pred[,3])), xlab = "Time", ylab = "Ratio",
+         main = "Bayesian analysis");
+    arrows(timefreq, pred[,2], timefreq, pred[,3], 
+           code=3, angle=90, length=0.05, col="gray", pch = 3);
+    
+    points(Obergaunlinguer_data$time, true_ratios, col = "black",pch=1);
+    points(timefreq, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
+    
+    leg <- c("true ratio", "pred ","pred uncertainty")
+    col=c("black","red","gray")
+    legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
+    
   }
   
   # testing if the true ratios are inside the bands
@@ -652,7 +680,12 @@ covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11,
                  }
                });
   
-  return(mean(prop));
+  #aux[aux[,2]<0,2] = 0; # it replaces negative values in lower limit
+  
+  l = aux[,3] - aux[,2];
+  p = mean(prop);
+  
+  return(list(covpbb = p, medBandWidth = median(l)));
   
 }
 

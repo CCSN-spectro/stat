@@ -67,7 +67,15 @@ r = specPdgrm(d$y,d$t, l=200, p=90, fs=fs, actPlot = TRUE,
 covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10, 
        Obergaunlinguer_data=Obergaunlinguer_data, actPlot=TRUE)
 
+#########################
+### BAYESIAN ANALYSIS ###
+#########################
 
+postSamples = read.table("postsamples.txt", header = T); # importing posterios samples
+
+covpbbBayes(noisydata, postSamples, l=200, p=90, fs=fs, movGmode = 11, 
+            um = 10, dm = 10, movBand = 5, timeGmode = NULL, 
+            Obergaunlinguer_data, actPlot =TRUE, fmean = mean(fits_data$f))
 
 
 

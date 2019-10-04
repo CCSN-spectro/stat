@@ -100,4 +100,4 @@ points(f, r, col='red')
 plot(fnew, rnewhat, col='black', type='l')
 points(f, r, col='red')
 
-
+write.table(outmatrix, file="postsamples.txt", row.names=FALSE, col.names=TRUE)
