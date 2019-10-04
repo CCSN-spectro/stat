@@ -67,5 +67,6 @@ R = repcovpbb(wvf.df, duration, ampl = c(1,5,10), fcut,
               movBand = 5, timeGmode = NULL, l=200, p=90, fs=fs,
               Obergaunlinguer_data)
 
-boxplot(R$covpbb)
+boxplot(R$covpbb,ylim = c(0, 1))
 boxplot(R$medBandWidth) # median lengths of the confidence intervals
+
