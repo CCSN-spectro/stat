@@ -308,13 +308,13 @@ repcovpbb = function(wvf, duration, ampl, fcut,
     out_bl = NULL;
     
     for(i in 1:N){
-      noisydata = data_generator(fs, duration, wvf, ampl, fcut, actPlot=TRUE);
+      noisydata = data_generator(fs, duration, wvf, ampl, fcut, actPlot=FALSE);
       noisydata = data.frame("V1"=noisydata$t,"V2"=noisydata$y);
       
       aux = covpbb(noisydata, mod, l, p, fs, movGmode, 
                    um, dm, movBand, timeGmode, 
                    Obergaunlinguer_data, actPlot = FALSE);
-   
+      #print(aux$covpbb)        
       out_cp = c(out_cp, aux$covpbb);
       out_bl = c(out_bl, aux$medBandWidth);      
     }
@@ -327,9 +327,7 @@ repcovpbb = function(wvf, duration, ampl, fcut,
     out_bl = list();
     
     for(j in ampl){
-      
-      print(j);
-      
+    
       aux_cp = NULL; # to save coverage probabilities
       aux_bl = NULL; # to save band widths
       
@@ -341,12 +339,11 @@ repcovpbb = function(wvf, duration, ampl, fcut,
         aux = covpbb(noisydata, mod, l, p, fs, movGmode, 
                      um, dm, movBand, timeGmode, 
                      Obergaunlinguer_data, actPlot = FALSE);
-        print(aux$covpbb)        
+        #print(aux$covpbb)        
         aux_cp = c(aux_cp, aux$covpbb);
         aux_bl = c(aux_bl, aux$medBandWidth);
         
       }
-      
       if(is.null(snr)){
         
         out_cp[[paste(j)]] = aux_cp;

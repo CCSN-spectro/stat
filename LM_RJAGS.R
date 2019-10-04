@@ -58,8 +58,6 @@ thin = 1
 # Random number seed
 seed = 42
 
-
-
 #compilation of the BUGS model, no Gibbs sampling yet
 foo <- jags.model(textConnection(BUGSmodel),data=data, inits=inits) 
 
@@ -69,10 +67,6 @@ update(foo, burn_in)
 #draws n.iter MCMC samples, monitors the parameters specified in variable.names, thins the
 #output by a factor of thin and stores everything in a MCMC.list object
 out <- coda.samples(model=foo, variable.names=parameters, n.iter=steps, thin=thin)
-
-
-
-
 
 #Obtain summary statistics for each of the monitored parameters
 summary(out)
@@ -100,4 +94,5 @@ points(f, r, col='red')
 plot(fnew, rnewhat, col='black', type='l')
 points(f, r, col='red')
 
+write.table(outmatrix, file="inputs/postsamples.txt",row.names=FALSE, col.names=TRUE)
 
