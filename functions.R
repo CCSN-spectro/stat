@@ -450,64 +450,6 @@ repcovpbbWN = function(data, mod, N, SDs, movGmode = 11, um, dm, movBand,
   
 }
 
-###################
-### Periodogram ###
-###################
-
-pdgrm = function(data, ylog = TRUE, main = NULL, ...){
-  
-  if(class(data) == "data.frame"){
-    
-    n = dim(data)[1];
-    
-    X = data$V2;
-    
-  }else if(class(data) == "numeric"){
-    
-    n = length(data);
-    
-    X = data;
-    
-  }
-  
-  N    = ifelse( n%%2 == 0, n/2+1, (n + 1)/2); # N=(n+1)/2 (ODD) or N=n/2+1 (EVEN)
-  
-  freq = seq(0, pi, length = N);
-  
-  # Frequencies to remove from estimate
-  if (n %% 2) {  # Odd length time series
-    bFreq = 1;
-    
-  }else {  # Even length time series
-    bFreq = c(1, N);
-  }
-  
-  pdgrm = (abs(stats::fft(X))^2 / (2 * pi * n))[1:N];
-  
-  if(ylog == TRUE){
-    
-    if(is.null(main)){
-      
-      main = c("log10-periodogram");
-      
-    }
-    
-    graphics::plot.default(freq[-bFreq], log(pdgrm[-bFreq]), type = "l", col = "grey",
-                           xlab = "Frequency", ylab = "log PSD", main = paste(main), ...);
-    
-  }else if(ylog == FALSE){
-    
-    if(is.null(main)){
-      
-      main = c("Periodogram");
-      
-    }
-    
-    graphics::plot.default(freq[-bFreq], pdgrm[-bFreq], type = "l", col = "grey",
-                           xlab = "Frequency", ylab = "PSD", main = paste(main), ...);
-  }
-}
-
 ##########################
 ### BAYESIAN functions ###
 ##########################
