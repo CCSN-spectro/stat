@@ -383,6 +383,198 @@ repcovpbb = function(wvf, duration, ampl, fcut,
 
 ##### Functions not yet checked by MAB
 
+########################################################################
+covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11, 
+                   um = 3, dm = 3, movBand = 5, timeGmode = NULL, 
+                   Obergaunlinguer_data, actPlot = FALSE, limFreq = NULL){
+  ########################################################################  
+  # data     : dataset as matrix (with no zeros [specPdgrm])
+  # mod      : model
+  # l        : interval length in spectrogram
+  # p        : overlaping percentage in spectrogram
+  # movGmode : number of steps to smooth estimated g-modes 
+  # um       : define upper neighborhood to find g-modes 
+  # dm       : define lower neighborhood to find g-modes
+  # movBand  : define the number of points to smooth the band
+  # timeGMode: time interval to define g-modes
+  # Oberganlinger_data: simulated R and M time evolution
+  # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
+  
+  # Compute true ratios
+  true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
+  
+  # spectrogram
+  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
+                zoomFreq=c(0,1)); # generating the spectrogram
+  
+  n = length(data$V1);
+  
+  # starting & ending points of the intervals used in the spectrogram
+  index = ints(n=n, l=l, p=p); # from psplinePsd
+  
+  # centred point for even "l"
+  mindx = index + cbind(rep(l/2 -1, dim(index)[1]), rep(-(l/2-1), dim(index)[1]));
+  
+  # Ajusting data
+  timedata = seq(from=data$V1[1], to=data$V1[n], length = n);
+  
+  # mean time (centred point) for our g-mode estimates
+  timefreq = apply(mindx, 1, function(x) mean(timedata[c(x[1], x[2])]) );
+  
+  # g-modes
+  if( !is.null(timeGmode)){
+    #timeGmode = data0[c(1,length(data0[,1])), 1];
+    out = apply(as.matrix(timefreq), 1, 
+                function(x){
+                  if((x >= timeGmode[1]) & (x <= timeGmode[2])){
+                    return(TRUE);
+                  }else{
+                    return(FALSE);
+                  }
+                });
+    
+    #maxf     = maxf[out];
+    timefreq = timefreq[out];
+    
+    r$x = r$x[out];
+    r$z = r$z[out, ];
+  }
+  
+  maxf = findGmodes(r, um=um, dm=dm);
+  maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
+  #points(timefreq,maxf, col = 'green')
+  
+  if(is.null(limFreq)){
+    
+    limFreq = Inf; # case in which there is no threshold for frequencies
+    
+  }
+  
+  out = NULL; # to store output
+  
+  for(j in limFreq){
+    
+    discFreq = (maxf < j); # positions to be discarded 
+    
+    if(all(!discFreq)){
+      
+      warning("All frequencies are greater than limFreq");
+      out = rbind(out, c(NA, NA));
+      
+    }else{
+      
+      maxf1     = maxf[discFreq]; # discarding frequencies according to limFreq
+      timefreq1 = timefreq[discFreq]; # discarding time points
+      
+      # defining true ratios according to limfreq 
+      timeTR    = Obergaunlinguer_data$time; 
+      discTR    = (timeTR >= min(timefreq1)) & (timeTR <= max(timefreq1));
+      timeTR    = timeTR[discTR];  
+      TR        = true_ratios[discTR]; # ratios in the interval
+      
+      # prediction : pred$fit pred$lwr pred$upr
+      new  = data.frame(f = maxf1);
+      pred = predict(mod, new, interval = "prediction"); # predictions
+      
+      #plot(new$f,pred[,1])
+      #pred[pred[,2] < 0, 2] = 0; # discarding negative values in CI
+      
+      ### generating band function ### 
+      # n = 1 is equal to system defined above
+      
+      # interpolating lower bound for predicted values
+      fd = approxfun(x = timefreq1, y = movf(pred[,2],n=movBand,median), method = "linear",
+                     yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
+      # interpolating upper bound for predicted values
+      fu = approxfun(x = timefreq1, y = movf(pred[,3],n=movBand,median), method = "linear",
+                     yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
+      
+      # fd & fu use smooth confidence intervals by using "movf"
+      aux = cbind(TR,          # true ratios
+                  fd(timeTR),  # lower band (using predicted ratios)
+                  fu(timeTR)); # upper band (using predicted ratios)
+      
+      if(actPlot == TRUE){
+        
+        #plot(new$f,pred[,1])
+        
+        #points(timefreq,maxf, col = 'green')
+        
+        #plot(Obergaunlinguer_data$time, aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
+        #points(Obergaunlinguer_data$time,aux[,2],col="red",pch=2)
+        #points(Obergaunlinguer_data$time,aux[,3],col="red",pch=3)
+        #leg <- c("true ratio", "pred lower","pred upper")
+        #col=c("black","red","red")
+        #legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
+        
+        # From plotOmeSim
+        yaux = c(true_ratios, pred[,2:3]);
+        plot(Obergaunlinguer_data$time, true_ratios, xlab = "Time",
+             ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
+             main = paste("Frequency cutoff", j));
+        arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
+               length=0.05, col="gray",pch=3);
+        points(Obergaunlinguer_data$time, true_ratios, col = "black",pch=1);
+        points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
+        
+        leg <- c("true ratio", "pred ","pred uncertainty")
+        col=c("black","red","gray")
+        legend("topleft",legend=leg,cex=.8,col=col,pch=c(1,2,3))
+        
+      } # end plot
+      
+      # discarding the true values which are out of the range of the predicted values
+      
+      # left side
+      disc = which(is.na(aux[,2]));
+      
+      if(length(disc) != 0){
+        aux = aux[-disc,];
+      }
+      
+      # right side
+      disc = which(is.na(aux[,3]));
+      
+      if(length(disc) != 0){
+        aux = aux[-disc,];
+      }
+      
+      # testing if the true ratios are inside the bands
+      prop = apply(aux, 1, 
+                   function(x){
+                     if((x[1]>= x[2]) && (x[1] <= x[3])){
+                       return(1);
+                     }else{
+                       return(0);
+                     }
+                   });
+      
+      aux[aux[,2]<0,2] = 0; # it replaces negative values in lower limit
+      
+      l = aux[,3] - aux[,2];
+      p = mean(prop);
+      
+      out = rbind(out, c(p, median(l))); # covpbb & medBandWidth
+      
+    } # end 'all(discFreq)'
+    
+  } # end loop
+  
+  if(length(limFreq) == 1){ # single estimate
+    
+    colnames(out) = c("covpbb", "medBandWidth"); 
+    
+  }else{ # multiple estimates
+    
+    out = cbind(limFreq, out);
+    colnames(out) = c("limFreq", "covpbb", "medBandWidth");
+    
+  }
+  
+  return(out);
+  
+}
+
 
 
 
