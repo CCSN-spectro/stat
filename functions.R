@@ -148,7 +148,7 @@ ints = function(n, l, p = 00, eq = TRUE){
 ########################################################################
 covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11, 
                   um = 3, dm = 3, movBand = 5, timeGmode = NULL, 
-                  Obergaunlinguer_data, actPlot = FALSE){
+                  thruth_data, actPlot = FALSE){
 ########################################################################  
   # data     : dataset as matrix (with no zeros [specPdgrm])
   # mod      : model
@@ -162,7 +162,8 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   # Oberganlinger_data: simulated R and M time evolution
   
   # Compute true ratios
-  true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
+#  true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
+  true_ratios=thruth_data$x
   
   # spectrogram
   r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
@@ -386,7 +387,7 @@ repcovpbb = function(wvf, duration, ampl, fcut,
 ########################################################################
 covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11, 
                    um = 3, dm = 3, movBand = 5, timeGmode = NULL, 
-                   Obergaunlinguer_data, actPlot = FALSE, limFreq = NULL){
+                   thruth_data, actPlot = FALSE, limFreq = NULL){
   ########################################################################  
   # data     : dataset as matrix (with no zeros [specPdgrm])
   # mod      : model
@@ -401,7 +402,8 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
   
   # Compute true ratios
-  true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
+  #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
+  true_ratios=thruth_data$x
   
   # spectrogram
   r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
@@ -648,7 +650,7 @@ repcovpbbWN = function(data, mod, N, SDs, movGmode = 11, um, dm, movBand,
 
 covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11, 
                        um = 3, dm = 3, movBand = 5, timeGmode = NULL,
-                       Obergaunlinguer_data, actPlot = FALSE, fmean = 0){
+                       thruth_data, actPlot = FALSE, fmean = 0){
   
   # The only difference with 'covpbb' function is how the predicted 
   #  values are calculated.
@@ -666,7 +668,8 @@ covpbbBayes = function(data, postSamples, l=200, p=90, fs=16384, movGmode = 11,
   # fmean: mean of frequencies used to generate the model
   
   # Compute true ratios
-  true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2));
+  #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2));
+  true_ratios = thruth_data$x
   
   # spectrogram
   r = specPdgrm(data$V2, data$V1, l = l, p = p, fs = fs, actPlot = FALSE, logPow = T,
