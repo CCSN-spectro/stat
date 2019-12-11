@@ -159,14 +159,14 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   # dm       : define lower neighborhood to find g-modes
   # movBand  : define the number of points to smooth the band
   # timeGMode: time interval to define g-modes
-  # Oberganlinger_data: simulated R and M time evolution
-  
+  # thruth_data: simulated ratio time evolution where ratio is M/R^2 (g2 mode) or (g3 mode)
+
   # Compute true ratios
-#  true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
+  #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
   true_ratios=thruth_data$x
   
   # spectrogram
-  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
+  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=TRUE, logPow=TRUE,
                 zoomFreq=c(0,1)); # generating the spectrogram
   
   n = length(data$V1);
@@ -204,7 +204,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   maxf = findGmodes(r, um=um, dm=dm);
   maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
-  #points(timefreq,maxf, col = 'green')
+  points(timefreq,maxf, col = 'green')
   
   # prediction : pred$fit pred$lwr pred$upr
   new  = data.frame(f = maxf);
@@ -225,31 +225,30 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   # fd & fu use smooth confidence intervals by using "movf"
   aux = cbind(true_ratios,                    # true ratios
-              fd(Obergaunlinguer_data$time),  # lower band (using predicted ratios)
-              fu(Obergaunlinguer_data$time)); # upper band (using predicted ratios)
+              fd(thruth_data$time),  # lower band (using predicted ratios)
+              fu(thruth_data$time)); # upper band (using predicted ratios)
   
   # discarding the true values which are out of the range of the predicted values
   
   if(actPlot == TRUE){
     
-    plot(new$f,pred[,1])
+#    plot(new$f,pred[,1])
+#    points(timefreq,maxf, col = 'green')
   
-    points(timefreq,maxf, col = 'green')
-  
-    plot(Obergaunlinguer_data$time,aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
-    points(Obergaunlinguer_data$time,aux[,2],col="red",pch=2)
-    points(Obergaunlinguer_data$time,aux[,3],col="red",pch=3)
-    leg <- c("true ratio", "pred lower","pred upper")
-    col=c("black","red","red")
-    legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
+#    plot(thruth_data$time,aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
+#    points(thruth_data$time,aux[,2],col="red",pch=2)
+#    points(thruth_data$time,aux[,3],col="red",pch=3)
+#    leg <- c("true ratio", "pred lower","pred upper")
+#    col=c("black","red","red")
+#    legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
   
   # From plotOmeSim
     yaux = c(true_ratios, pred[,2:3]);
-    plot(Obergaunlinguer_data$time, true_ratios, xlab = "Time",
+    plot(thruth_data$time, true_ratios, xlab = "Time",
        ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n");
     arrows(timefreq, pred[,2], timefreq, pred[,3], code=3, angle=90,
          length=0.05, col="gray",pch=3);
-    points(Obergaunlinguer_data$time, true_ratios, col = "black",pch=1);
+    points(thruth_data$time, true_ratios, col = "black",pch=1);
     points(timefreq, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
   
     leg <- c("true ratio", "pred ","pred uncertainty")
@@ -295,8 +294,8 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
 ########################################################################
 repcovpbb = function(wvf, duration, ampl, fcut,
                      mod, N, snr = NULL, movGmode = 11, um = 3, dm = 3,
-                     movBand = 5, timeGmode = NULL, l=200, p=90, fs=16384,
-                     Obergaunlinguer_data){
+                     movBand = 5, timeGmode = NULL, l=200, p=90, fs=16384, limFreq=NULL,
+                     thruth_data){
 ########################################################################  
   # data : matrix (time, signal)
   # mod  : lm object
@@ -304,18 +303,21 @@ repcovpbb = function(wvf, duration, ampl, fcut,
   # ampl : distances (scalar or vector)
 
   if(length(ampl) == 1){
-    
+  
     out_cp = NULL;
     out_bl = NULL;
     
     for(i in 1:N){
       noisydata = data_generator(fs, duration, wvf, ampl, fcut, actPlot=FALSE);
       noisydata = data.frame("V1"=noisydata$t,"V2"=noisydata$y);
-      
-      aux = covpbb(noisydata, mod, l, p, fs, movGmode, 
-                   um, dm, movBand, timeGmode, 
-                   Obergaunlinguer_data, actPlot = FALSE);
-      #print(aux$covpbb)        
+      if (is.null(limFreq)){
+        aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
+                     thruth_data=thruth_data, actPlot = FALSE);
+      }else{        
+        aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
+                     thruth_data=thruth_data, actPlot = FALSE);
+      }
+      print(aux$covpbb)        
       out_cp = c(out_cp, aux$covpbb);
       out_bl = c(out_bl, aux$medBandWidth);      
     }
@@ -328,7 +330,7 @@ repcovpbb = function(wvf, duration, ampl, fcut,
     out_bl = list();
     
     for(j in ampl){
-    
+      print(j)
       aux_cp = NULL; # to save coverage probabilities
       aux_bl = NULL; # to save band widths
       
@@ -337,9 +339,14 @@ repcovpbb = function(wvf, duration, ampl, fcut,
         noisydata = data_generator(fs, duration, wvf, ampl = j, fcut, actPlot=FALSE);
         noisydata = data.frame("V1"=noisydata$t,"V2"=noisydata$y);
         
-        aux = covpbb(noisydata, mod, l, p, fs, movGmode, 
-                     um, dm, movBand, timeGmode, 
-                     Obergaunlinguer_data, actPlot = FALSE);
+        if (is.null(limFreq)){
+          aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
+                       thruth_data=thruth_data, actPlot = FALSE);
+        }else{        
+          aux = covpbb1(noisydata, mod, l, p, fs, um, dm, 
+                        thruth_data=thruth_data, actPlot = FALSE, limFreq);
+        }
+
         #print(aux$covpbb)        
         aux_cp = c(aux_cp, aux$covpbb);
         aux_bl = c(aux_bl, aux$medBandWidth);
@@ -359,7 +366,6 @@ repcovpbb = function(wvf, duration, ampl, fcut,
     }
     
     out = list(covpbb = out_cp, medBandWidth = out_bl);
-    
   }
   
   return(out)
