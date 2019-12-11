@@ -46,6 +46,8 @@ colnames(true_data) = c ("time","x");
 ##################################
 # data to generate model
 fits_data = read.table("../simulation_data/A-A_fits_data_g2.dat", sep = ",", comment.char = "#");
+#fits_data = read.table("../simulation_data/CoCo_fits_data_g2.dat", sep = ",", comment.char = "#");
+
 colnames(fits_data) = c("r", "f");
 
 #mod = lm(r~ 0 + f + I(f^2) + I(f^3), data = fits_data); # first model
@@ -76,6 +78,13 @@ covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10,
 covpbb1(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10, 
         thruth_data=true_data, actPlot=TRUE,
         limFreq = c(1000, 1200, 1300, 1400, Inf));
+
+R = repcovpbb(wvf.df, duration, ampl = c(10), fcut,
+              mod, N = 10, snr = NULL, movGmode = 11, um = 3, dm = 3,
+              movBand = 5, timeGmode = NULL, l=200, p=90, fs=fs, limFreq=1000,
+              thruth_data=true_data)
+
+boxplot(R$covpbb,ylim = c(0, 1),xlab='amplitude factor',ylab='ratio',main='Frequentist')
 
 #########################
 ### BAYESIAN ANALYSIS ###
