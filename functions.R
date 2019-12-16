@@ -405,6 +405,7 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   # movBand  : define the number of points to smooth the band
   # timeGMode: time interval to define g-modes
   # Oberganlinger_data: simulated R and M time evolution
+  # thruth_data: true ratio and time
   # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
   
   # Compute true ratios
@@ -458,7 +459,8 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     
   }
   
-  out = NULL; # to store output
+  out1 = NULL; # to store output - coverage probability
+  out2 = NULL; # to store output - stat of residuals
   
   for(j in limFreq){
     
@@ -466,8 +468,8 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     
     if(all(!discFreq)){
       
-      warning("All frequencies are greater than limFreq");
-      out = rbind(out, c(NA, NA));
+      warning(paste("All frequencies are greater than limFreq", j));
+      out1 = rbind(out1, c(NA, NA));
       
     }else{
       
@@ -475,7 +477,7 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
       timefreq1 = timefreq[discFreq]; # discarding time points
       
       # defining true ratios according to limfreq 
-      timeTR    = Obergaunlinguer_data$time; 
+      timeTR    = thruth_data$time; 
       discTR    = (timeTR >= min(timefreq1)) & (timeTR <= max(timefreq1));
       timeTR    = timeTR[discTR];  
       TR        = true_ratios[discTR]; # ratios in the interval
@@ -495,6 +497,9 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
                      yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
       # interpolating upper bound for predicted values
       fu = approxfun(x = timefreq1, y = movf(pred[,3],n=movBand,median), method = "linear",
+                     yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
+      # interpolating point estimates
+      fm = approxfun(x = timefreq1, y = movf(pred[,1],n=movBand,median), method = "linear",
                      yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
       
       # fd & fu use smooth confidence intervals by using "movf"
@@ -517,12 +522,12 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         
         # From plotOmeSim
         yaux = c(true_ratios, pred[,2:3]);
-        plot(Obergaunlinguer_data$time, true_ratios, xlab = "Time",
+        plot(thruth_data$time, true_ratios, xlab = "Time",
              ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
              main = paste("Frequency cutoff", j));
         arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
                length=0.05, col="gray",pch=3);
-        points(Obergaunlinguer_data$time, true_ratios, col = "black",pch=1);
+        points(thruth_data$time, true_ratios, col = "black",pch=1);
         points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
         
         leg <- c("true ratio", "pred ","pred uncertainty")
@@ -531,7 +536,7 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         
       } # end plot
       
-      # discarding the true values which are out of the range of the predicted values
+      # discarding the true values which are out1 of the range of the predicted values
       
       # left side
       disc = which(is.na(aux[,2]));
@@ -562,7 +567,12 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
       l = aux[,3] - aux[,2];
       p = mean(prop);
       
-      out = rbind(out, c(p, median(l))); # covpbb & medBandWidth
+      out1 = rbind(out1, c(p, median(l))); # covpbb & medBandWidth
+      
+      # Residuals
+      res  = TR - fm(timeTR); # true_value - estimate
+      res  = c(summary(res), sd(res));
+      out2 = rbind(out2, res);
       
     } # end 'all(discFreq)'
     
@@ -570,20 +580,21 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   if(length(limFreq) == 1){ # single estimate
     
-    colnames(out) = c("covpbb", "medBandWidth"); 
+    colnames(out1) = c("covpbb", "medBandWidth"); 
     
   }else{ # multiple estimates
     
-    out = cbind(limFreq, out);
-    colnames(out) = c("limFreq", "covpbb", "medBandWidth");
-    
+    out1 = cbind(limFreq, out1);
+    out2 = cbind(limFreq, out2);
+    colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
   }
   
-  return(out);
+  colnames(out2)[length(colnames(out2))] = "sd";
+  rownames(out2) = NULL;
+  
+  return(list(covpbb = out1, residual = out2));
   
 }
-
-
 
 
 repcovpbbWN = function(data, mod, N, SDs, movGmode = 11, um, dm, movBand, 
