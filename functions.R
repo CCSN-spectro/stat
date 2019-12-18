@@ -470,6 +470,7 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
       
       warning(paste("All frequencies are greater than limFreq", j));
       out1 = rbind(out1, c(NA, NA));
+      out2 = rbind(out2, rep(NA, 8));
       
     }else{
       
