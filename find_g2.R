@@ -96,5 +96,33 @@ covpbbBayes(noisydata, postSamples, l=200, p=90, fs=fs, movGmode = 11,
             um=10, dm=10, movBand=5, timeGmode = NULL, 
             thruth_data=true_data, actPlot =TRUE, fmean = mean(fits_data$f))
 
+#########################
+### Multiple Analysis ###
+#########################
 
+# Multiple Analysis for different distances and frequency threshold
 
+N    = 100;          # number of replications
+dist = c(1,2,3,4,5); # distances = 10/amplitudFactor
+out1 = out2 = NULL;  # to store outputs
+
+for(d in dist){
+  print(d)
+  for(i in 1:N){
+    #print(i)
+    set.seed(i);
+    newdata = data_generator(fs, duration, wvf.df, ampl = 10/d, fcut, actPlot=FALSE);
+    noisydata = data.frame("V1"=newdata$t, "V2"=newdata$y);
+    
+    x = covpbb1(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10, 
+                thruth_data=true_data, actPlot=FALSE,
+                limFreq = c(1000, 1100, 1200, Inf));
+    
+    out1 = rbind(out1, cbind(d, x$covpbb));   # coverage probability 
+    out2 = rbind(out2, cbind(d, x$residual)); # statistics of residuals  
+  }
+}
+
+# Boxplots # Note that there are NA values in out1
+boxplot(covpbb~d+limFreq, out1, xlab = "distance : freq treshold");
+boxplot(covpbb~limFreq+d, out1, xlab = "freq treshold : distance");
