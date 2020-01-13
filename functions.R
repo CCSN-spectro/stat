@@ -271,7 +271,6 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   }
   
   # testing if the true ratios are inside the bands
-  # testing if the true ratios are inside the bands
   prop = apply(aux, 1, 
                function(x){
                  if((x[1]>= x[2]) && (x[1] <= x[3])){
@@ -373,23 +372,6 @@ repcovpbb = function(wvf, duration, ampl, fcut,
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##### Functions not yet checked by MAB
-
 ########################################################################
 covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11, 
                    um = 3, dm = 3, movBand = 5, timeGmode = NULL, 
@@ -404,8 +386,8 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   # dm       : define lower neighborhood to find g-modes
   # movBand  : define the number of points to smooth the band
   # timeGMode: time interval to define g-modes
-  # Oberganlinger_data: simulated R and M time evolution
   # thruth_data: true ratio and time
+  # thruth_data: simulated ratio time evolution where ratio is M/R^2 (g2 mode) or (g3 mode)
   # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
   
   # Compute true ratios
@@ -511,12 +493,11 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
       if(actPlot == TRUE){
         
         #plot(new$f,pred[,1])
-        
         #points(timefreq,maxf, col = 'green')
         
-        #plot(Obergaunlinguer_data$time, aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
-        #points(Obergaunlinguer_data$time,aux[,2],col="red",pch=2)
-        #points(Obergaunlinguer_data$time,aux[,3],col="red",pch=3)
+        #plot(thruth_data$time, aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
+        #points(thruth_data$time,aux[,2],col="red",pch=2)
+        #points(thruth_data$time,aux[,3],col="red",pch=3)
         #leg <- c("true ratio", "pred lower","pred upper")
         #col=c("black","red","red")
         #legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
@@ -597,6 +578,23 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   return(list(covpbb = out1, residual = out2));
   
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##### Functions not yet checked by MAB
+
 
 
 repcovpbbWN = function(data, mod, N, SDs, movGmode = 11, um, dm, movBand, 
