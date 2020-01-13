@@ -47,7 +47,7 @@ colnames(true_data) = c ("time","x");
 ### Frequentist analysis model ###
 ##################################
 # data to generate model
-fits_data = read.table("../simulation_data/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
+#fits_data = read.table("../simulation_data/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
 fits_data = read.table("inputs/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
 
 colnames(fits_data) = c("r", "f");
