@@ -14,7 +14,8 @@ fcut=15
 ######################
 ### prepare signal ###
 ######################
-s20 = read.table("../simulation_data/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
+#s20 = read.table("../simulation_data/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
+s20 = read.table("inputs/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
 
 # signal sampled at 16384 Hz. Resampling at fs
 signaly=resample(s20$V2,1/16384,1/fs)
@@ -38,7 +39,8 @@ timeGmode = s20_0[c(1,length(s20_0[,1])), 1];#time interval for signal different
 ###################
 
 # For g2 modes, ratio (x variable in TF19) is x = Mpns / Rpns^2 
-true_data = read.table("../simulation_data/s20_data_g2.dat", sep = ",", comment.char = "#",header = TRUE); # true values
+#true_data = read.table("../simulation_data/s20_data_g2.dat", sep = ",", comment.char = "#",header = TRUE); # true values
+true_data = read.table("inputs/s20_data_g2.dat", sep = ",", comment.char = "#",header = TRUE); # true values
 colnames(true_data) = c ("time","x");
 
 ##################################
@@ -46,7 +48,7 @@ colnames(true_data) = c ("time","x");
 ##################################
 # data to generate model
 fits_data = read.table("../simulation_data/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
-#fits_data = read.table("../simulation_data/CoCo_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
+fits_data = read.table("inputs/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
 
 colnames(fits_data) = c("r", "f");
 
@@ -124,5 +126,5 @@ for(d in dist){
 }
 
 # Boxplots # Note that there are NA values in out1
-boxplot(covpbb~d+limFreq, out1, xlab = "distance : freq treshold");
-boxplot(covpbb~limFreq+d, out1, xlab = "freq treshold : distance");
+boxplot(covpbb~d+limFreq, out1, xlab = "distance : freq threshold");
+boxplot(covpbb~limFreq+d, out1, xlab = "freq threshold : distance");
