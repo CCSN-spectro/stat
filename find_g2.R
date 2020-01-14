@@ -14,8 +14,7 @@ fcut=15
 ######################
 ### prepare signal ###
 ######################
-#s20 = read.table("../simulation_data/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
-s20 = read.table("inputs/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
+s20 = read.table("../simulation_data/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
 
 # signal sampled at 16384 Hz. Resampling at fs
 signaly=resample(s20$V2,1/16384,1/fs)
@@ -39,16 +38,15 @@ timeGmode = s20_0[c(1,length(s20_0[,1])), 1];#time interval for signal different
 ###################
 
 # For g2 modes, ratio (x variable in TF19) is x = Mpns / Rpns^2 
-#true_data = read.table("../simulation_data/s20_data_g2.dat", sep = ",", comment.char = "#",header = TRUE); # true values
-true_data = read.table("inputs/s20_data_g2.dat", sep = ",", comment.char = "#",header = TRUE); # true values
+true_data = read.table("../simulation_data/s20_data_g2.dat", sep = ",", comment.char = "#",header = TRUE); # true values
 colnames(true_data) = c ("time","x");
 
 ##################################
 ### Frequentist analysis model ###
 ##################################
 # data to generate model
-#fits_data = read.table("../simulation_data/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
-fits_data = read.table("inputs/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
+fits_data = read.table("../simulation_data/A-A_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
+#fits_data = read.table("../simulation_data/CoCo_fits_data_g2.dat", sep = ",", comment.char = "#",header = TRUE);
 
 colnames(fits_data) = c("r", "f");
 
@@ -81,8 +79,8 @@ covpbb1(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10,
         thruth_data=true_data, actPlot=TRUE,
         limFreq = c(1000, 1200, 1300, 1400, Inf));
 
-R = repcovpbb(wvf.df, duration, ampl = c(10), fcut,
-              mod, N = 10, snr = NULL, movGmode = 11, um = 3, dm = 3,
+R = repcovpbb(wvf.df, duration, ampl = c(10,10/2,10/3,10/4,10/5,10/6,10/7,10/8,10/9,10/10), fcut,
+              mod, N = 100, snr = NULL, movGmode = 11, um = 3, dm = 3,
               movBand = 5, timeGmode = NULL, l=200, p=90, fs=fs, limFreq=1000,
               thruth_data=true_data)
 
@@ -126,5 +124,5 @@ for(d in dist){
 }
 
 # Boxplots # Note that there are NA values in out1
-boxplot(covpbb~d+limFreq, out1, xlab = "distance : freq threshold");
-boxplot(covpbb~limFreq+d, out1, xlab = "freq threshold : distance");
+boxplot(covpbb~d+limFreq, out1, xlab = "distance : freq treshold");
+boxplot(covpbb~limFreq+d, out1, xlab = "freq treshold : distance");
