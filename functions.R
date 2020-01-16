@@ -3,20 +3,51 @@ library ("signal")
 source ("data_generator.R")
 
 ########################################################################
-findGmodes = function(r, um, dm){
+findGmodes = function(r, um, dm, m = 8, initfreq = c(-Inf, Inf)){
 ########################################################################
+  
   # data must not contain zeros, so 'r' must not contain NA values
   # finding g-modes
-
+  
   # r  : output from specPdgrm
   # um : up   - to define the neighborhood
   # dm : down - to define the neighborhood
+  # m  : number of intervals used to calculated starting value
+  # initfreq: interval to restrict frequency for the starting value
+  
+  #if(initfreq[1]>=initfreq[2])stop("initfreq[1] must be lower than initfreq[2]");
   
   x = r$x; y = r$y; z = r$z; # values from spectrogram
   
+  # limiting frequencies according to initfreq in y
+  inity = (y >= initfreq[1]) & (y <= initfreq[2]); # logical vector
+  
+  if(m != 1){
+    
+    zn    = dim(z)[1]; # row number (columns in spectrogram) 
+    initz = z[seq(zn, zn - m + 1), ]; # m last columns of the spectrogram
+    
+    if(initfreq[1] != -Inf || initfreq[2] != Inf){
+      initz[, !inity] = -Inf; # discarding certain freq according to initfreq
+    }
+    
+    mp    = apply(initz, 1, which.max); # maximum in last m columns of spectrogram
+    mp    = round(median(mp)); # position maximum value
+    
+  }else if(m == 1){
+    
+    initz = z[dim(z)[1],]; # last column of spectrogram
+    
+    if(initfreq[1] != -Inf || initfreq[2] != Inf){
+      initz[!inity] = -Inf;
+    }
+    
+    mp = which.max(z[dim(z)[1],]); # position maximum value
+    
+  }
+  
   ps = NULL;
-  mp = which.max(z[dim(z)[1],]); # position maximum value
-
+  
   for(i in (dim(z)[1]-1):1){
     
     #print(i);
@@ -31,18 +62,32 @@ findGmodes = function(r, um, dm){
   ps   = ps[length(ps):1]
   maxf = y[ps]; # FREQUENCIES FOR LARGEST POWER
   return(maxf);
-
+  
 }
 
 ########################################################################
 movf = function(vec, n, f){
 ########################################################################
+  
+  # This function smoothes the numeric vector "vec". 
+  # It applies the "f" function in intervals of length "n".
+  #
+  # vec : numeric vector.
+  # n   : interval length for smoothing.
+  # f   : function to smooth vec, for instance, mean or median.
 
   if(n == 1){
     return(vec);
   }
   
   N   = length(vec);
+  
+  if(N < n){
+    
+    warning("The length of 'vec' must be greater than 'n'");
+    return(vec);
+  }
+  
   out = rep(NA, N);
   
   if( n %% 2 != 0){ # odd
@@ -152,7 +197,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
 ########################################################################  
   # data     : dataset as matrix (with no zeros [specPdgrm])
   # mod      : model
-  # l        : interval length in spectrogram
+  # l        : interval length in spectrogram (even number)
   # p        : overlaping percentage in spectrogram
   # movGmode : number of steps to smooth estimated g-modes 
   # um       : define upper neighborhood to find g-modes 
@@ -163,7 +208,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
 
   # Compute true ratios
   #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
-  true_ratios=thruth_data$x
+  true_ratios=thruth_data$x;
   
   # spectrogram
   r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=TRUE, logPow=TRUE,
@@ -374,21 +419,30 @@ repcovpbb = function(wvf, duration, ampl, fcut,
 
 ########################################################################
 covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11, 
-                   um = 3, dm = 3, movBand = 5, timeGmode = NULL, 
+                   um = 3, dm = 3, m = 8, initfreq = c(-Inf, Inf),
+                   movBand = 5, timeGmode = NULL, 
                    thruth_data, actPlot = FALSE, limFreq = NULL){
-  ########################################################################  
+########################################################################  
+  
   # data     : dataset as matrix (with no zeros [specPdgrm])
   # mod      : model
   # l        : interval length in spectrogram
   # p        : overlaping percentage in spectrogram
+  # fs       : sampling frequency
   # movGmode : number of steps to smooth estimated g-modes 
-  # um       : define upper neighborhood to find g-modes 
-  # dm       : define lower neighborhood to find g-modes
+  # 
   # movBand  : define the number of points to smooth the band
   # timeGMode: time interval to define g-modes
   # thruth_data: true ratio and time
   # thruth_data: simulated ratio time evolution where ratio is M/R^2 (g2 mode) or (g3 mode)
+  # actPlot  : logical value to produce plot
   # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
+  
+  # In 'findGmodes' function
+  # um : up   - to define the neighborhood to find g-modes 
+  # dm : down - to define the neighborhood to find g-modes 
+  # m  : number of intervals used to calculated starting value
+  # initfreq: interval to restrict frequency for the starting value
   
   # Compute true ratios
   #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
@@ -398,7 +452,7 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
                 zoomFreq=c(0,1)); # generating the spectrogram
   
-  n = length(data$V1);
+  n = length(data$V1); # number of observations
   
   # starting & ending points of the intervals used in the spectrogram
   index = ints(n=n, l=l, p=p); # from psplinePsd
@@ -431,7 +485,7 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     r$z = r$z[out, ];
   }
   
-  maxf = findGmodes(r, um=um, dm=dm);
+  maxf = findGmodes(r, um=um, dm=dm, m, initfreq);
   maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
   #points(timefreq,maxf, col = 'green')
   
@@ -448,13 +502,19 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     
     discFreq = (maxf < j); # positions to be discarded 
     
-    if(all(!discFreq)){
+    sfq = sum(discFreq);
+    
+    if(sfq <= 2){ 
       
-      warning(paste("All frequencies are greater than limFreq", j));
+      if(sfq == 0){
+        warning(paste("All frequencies are greater than limFreq", j));
+      }else{
+        warning(paste("only", sfq, "frequencies are greater than limFreq", j));
+      }
       out1 = rbind(out1, c(NA, NA));
       out2 = rbind(out2, rep(NA, 7));
       
-    }else{
+    }else{ # At least 3 g-modes (in maxf) are required to generate the cvvpbb band
       
       maxf1     = maxf[discFreq]; # discarding frequencies according to limFreq
       timefreq1 = timefreq[discFreq]; # discarding time points
@@ -512,9 +572,9 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         points(thruth_data$time, true_ratios, col = "black",pch=1);
         points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
         
-        leg <- c("true ratio", "pred ","pred uncertainty")
-        col=c("black","red","gray")
-        legend("topleft",legend=leg,cex=.8,col=col,pch=c(1,2,3))
+        leg <- c("true ratio", "pred ","pred uncertainty");
+        col <- c("black","red","gray");
+        legend("topleft",legend=leg,cex=.8,col=col,pch=c(1,2,3));
         
       } # end plot
       

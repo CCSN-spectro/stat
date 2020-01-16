@@ -109,14 +109,15 @@ dist = c(1,2,3,4,5); # distances = 10/amplitudFactor
 out1 = out2 = NULL;  # to store outputs
 
 for(d in dist){
-  print(d)
-  for(i in 1:N){
-    #print(i)
+  print(d);
+  for(i in 5001:N){
+    #print(i);
     set.seed(i);
     newdata = data_generator(fs, duration, wvf.df, ampl = 10/d, fcut, actPlot=FALSE);
     noisydata = data.frame("V1"=newdata$t, "V2"=newdata$y);
     
-    x = covpbb1(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10, 
+    x = covpbb1(noisydata, mod=mod, l=200, p=90, fs=fs,
+                um=10,dm=10, m = 8, initfreq = c(500, 2000),
                 thruth_data=true_data, actPlot=FALSE,
                 limFreq = c(1000, 1100, 1200, Inf));
     
