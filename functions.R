@@ -3,7 +3,7 @@ library ("signal")
 source ("data_generator.R")
 
 ########################################################################
-findGmodes = function(r, um, dm, m = 8, initfreq = c(-Inf, Inf)){
+findGmodes = function(r, um, dm, m = 1, initfreq = c(-Inf, Inf)){
 ########################################################################
   
   # data must not contain zeros, so 'r' must not contain NA values
@@ -18,13 +18,16 @@ findGmodes = function(r, um, dm, m = 8, initfreq = c(-Inf, Inf)){
   #if(initfreq[1]>=initfreq[2])stop("initfreq[1] must be lower than initfreq[2]");
   
   x = r$x; y = r$y; z = r$z; # values from spectrogram
-  
+
   # limiting frequencies according to initfreq in y
   inity = (y >= initfreq[1]) & (y <= initfreq[2]); # logical vector
+#  output <- c(initfreq[1],initfreq[2],dim(z)[1],dim(z)[2])
+#  print(output);
   
   if(m != 1){
     
-    zn    = dim(z)[1]; # row number (columns in spectrogram) 
+    zn    = dim(z)[1]; # row number (columns in spectrogram)
+    print(m)
     initz = z[seq(zn, zn - m + 1), ]; # m last columns of the spectrogram
     
     if(initfreq[1] != -Inf || initfreq[2] != Inf){
@@ -33,7 +36,6 @@ findGmodes = function(r, um, dm, m = 8, initfreq = c(-Inf, Inf)){
     
     mp    = apply(initz, 1, which.max); # maximum in last m columns of spectrogram
     mp    = round(median(mp)); # position maximum value
-    
   }else if(m == 1){
     
     initz = z[dim(z)[1],]; # last column of spectrogram
@@ -41,26 +43,30 @@ findGmodes = function(r, um, dm, m = 8, initfreq = c(-Inf, Inf)){
     if(initfreq[1] != -Inf || initfreq[2] != Inf){
       initz[!inity] = -Inf;
     }
-    
-    mp = which.max(z[dim(z)[1],]); # position maximum value
-    
+
+    mp = which.max(initz); # position maximum value
   }
   
   ps = NULL;
-  
+#  print(mp)
   for(i in (dim(z)[1]-1):1){
-    
-    #print(i);
+#    output <- c(dim(z)[1],i,mp)
+#    print(output);
     ps  = c(ps, mp);
     ind = (mp-dm):(mp+um);
     ind = ind[ind>0]; # preventing values below 0
     ind = ind[ind<dim(z)[2]]; # preventing from large values
+    
+    ind = ind[which(y[ind]<initfreq[2])] # preventing indexes to explore region forbidden by initfreq array
+#    ind = ind[which(y[ind]>initfreq[1])] # preventing indexes to explore region forbidden by initfreq array
     mp  = ind[which.max(z[i, ind])];
+#    print(z[i,ind])
   }
   
   ps   = c(ps, mp);
   ps   = ps[length(ps):1]
   maxf = y[ps]; # FREQUENCIES FOR LARGEST POWER
+#  print(length(maxf))
   return(maxf);
   
 }
@@ -249,7 +255,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   maxf = findGmodes(r, um=um, dm=dm);
   maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
-  points(timefreq,maxf, col = 'green')
+  points(timefreq, maxf, col = 'black')
   
   # prediction : pred$fit pred$lwr pred$upr
   new  = data.frame(f = maxf);
@@ -338,6 +344,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
 ########################################################################
 repcovpbb = function(wvf, duration, ampl, fcut,
                      mod, N, snr = NULL, movGmode = 11, um = 3, dm = 3,
+                     m = 1, initfreq,
                      movBand = 5, timeGmode = NULL, l=200, p=90, fs=16384, limFreq=NULL,
                      thruth_data){
 ########################################################################  
@@ -357,9 +364,10 @@ repcovpbb = function(wvf, duration, ampl, fcut,
       if (is.null(limFreq)){
         aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
                      thruth_data=thruth_data, actPlot = FALSE);
-      }else{        
-        aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
-                     thruth_data=thruth_data, actPlot = FALSE);
+      }else{
+        print(m)
+        aux = covpbb1(noisydata, mod, l, p, fs, um, dm, m, initfreq,
+                     thruth_data=thruth_data, actPlot = FALSE, limFreq);
       }
       print(aux$covpbb)        
       out_cp = c(out_cp, aux$covpbb);
@@ -387,7 +395,8 @@ repcovpbb = function(wvf, duration, ampl, fcut,
           aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
                        thruth_data=thruth_data, actPlot = FALSE);
         }else{        
-          aux = covpbb1(noisydata, mod, l, p, fs, um, dm, 
+          aux = covpbb1(noisydata, mod, l, p, fs, um, dm,
+                        m, initFreq,
                         thruth_data=thruth_data, actPlot = FALSE, limFreq);
         }
 
@@ -415,6 +424,8 @@ repcovpbb = function(wvf, duration, ampl, fcut,
   return(out)
   
 }
+
+
 
 
 ########################################################################
@@ -449,11 +460,11 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   true_ratios=thruth_data$x
   
   # spectrogram
-  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
+  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=TRUE, logPow=TRUE,
                 zoomFreq=c(0,1)); # generating the spectrogram
   
   n = length(data$V1); # number of observations
-  
+
   # starting & ending points of the intervals used in the spectrogram
   index = ints(n=n, l=l, p=p); # from psplinePsd
   
@@ -465,7 +476,7 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   # mean time (centred point) for our g-mode estimates
   timefreq = apply(mindx, 1, function(x) mean(timedata[c(x[1], x[2])]) );
-  
+
   # g-modes
   if( !is.null(timeGmode)){
     #timeGmode = data0[c(1,length(data0[,1])), 1];
@@ -487,7 +498,9 @@ covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   maxf = findGmodes(r, um=um, dm=dm, m, initfreq);
   maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
-  #points(timefreq,maxf, col = 'green')
+
+  points(r$x,maxf, col = 'black')
+#  points(timefreq,maxf, col = 'black')
   
   if(is.null(limFreq)){
     
