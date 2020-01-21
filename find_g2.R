@@ -8,7 +8,7 @@ library(signal)
 ##################
 fs=4096
 duration=1
-ampl=10
+ampl=5
 fcut=15
 
 ######################
@@ -76,11 +76,13 @@ covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10,
 
 
 covpbb1(noisydata, mod=mod, l=200, p=90, fs=fs,um=10,dm=10, 
-        thruth_data=true_data, actPlot=TRUE,
-        limFreq = c(1000, 1200, 1300, 1400, Inf));
+        m = 8, initfreq = c(100, 1600),
+        thruth_data=true_data, actPlot=FALSE,
+        limFreq = c(1000, Inf));
 
-R = repcovpbb(wvf.df, duration, ampl = c(10,10/2,10/3,10/4,10/5,10/6,10/7,10/8,10/9,10/10), fcut,
+R = repcovpbb(wvf.df, duration, ampl = c(10), fcut,
               mod, N = 100, snr = NULL, movGmode = 11, um = 3, dm = 3,
+              m = 8, initfreq = c(100, 1600),
               movBand = 5, timeGmode = NULL, l=200, p=90, fs=fs, limFreq=1000,
               thruth_data=true_data)
 
