@@ -1,73 +1,205 @@
 library ("seewave");
 library ("signal")
 source ("data_generator.R")
+library(lmvar)
 
 ########################################################################
-findGmodes = function(r, um, dm, m = 1, initfreq = c(-Inf, Inf)){
+findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8, 
+                      initfreq_R = c(-Inf, Inf), initfreq_L = c(-Inf, Inf),
+                      testSlope = FALSE){
 ########################################################################
   
   # data must not contain zeros, so 'r' must not contain NA values
   # finding g-modes
   
-  # r  : output from specPdgrm
-  # um : up   - to define the neighborhood
-  # dm : down - to define the neighborhood
-  # m  : number of intervals used to calculated starting value
-  # initfreq: interval to restrict frequency for the starting value
+  # r    : output from specPdgrm
+  # Paremeters for exploration starting from the right side
+  # um_R : up   - to define the neighborhood 
+  # dm_R : down - to define the neighborhood
+  # m_R  : number of intervals used to calculated starting value
+  # initfreq_R: interval to restrict frequency for the starting value
+  
+  # Paremeters for exploration starting from the left side
+  # um_L : up   - to define the neighborhood 
+  # dm_L : down - to define the neighborhood
+  # m_L  : number of intervals used to calculated starting value
+  # initfreq_L: interval to restrict frequency for the starting value
   
   #if(initfreq[1]>=initfreq[2])stop("initfreq[1] must be lower than initfreq[2]");
   
   x = r$x; y = r$y; z = r$z; # values from spectrogram
-
-  # limiting frequencies according to initfreq in y
-  inity = (y >= initfreq[1]) & (y <= initfreq[2]); # logical vector
-#  output <- c(initfreq[1],initfreq[2],dim(z)[1],dim(z)[2])
-#  print(output);
   
-  if(m != 1){
+  ##################
+  ### Right side ###
+  ##################
+  
+  # limiting frequencies according to initfreq in y
+  inity = (y >= initfreq_R[1]) & (y <= initfreq_R[2]); # logical vector
+  
+  if(m_R != 1){
     
-    zn    = dim(z)[1]; # row number (columns in spectrogram)
-    print(m)
-    initz = z[seq(zn, zn - m + 1), ]; # m last columns of the spectrogram
+    zn    = dim(z)[1]; # row number (columns in spectrogram) 
+    initz = z[seq(zn, zn - m_R + 1), ]; # m last columns of the spectrogram
     
-    if(initfreq[1] != -Inf || initfreq[2] != Inf){
+    if(initfreq_R[1] != -Inf || initfreq_R[2] != Inf){
       initz[, !inity] = -Inf; # discarding certain freq according to initfreq
     }
     
     mp    = apply(initz, 1, which.max); # maximum in last m columns of spectrogram
     mp    = round(median(mp)); # position maximum value
-  }else if(m == 1){
+    
+  }else if(m_R == 1){
     
     initz = z[dim(z)[1],]; # last column of spectrogram
     
-    if(initfreq[1] != -Inf || initfreq[2] != Inf){
+    if(initfreq_R[1] != -Inf || initfreq_R[2] != Inf){
       initz[!inity] = -Inf;
     }
-
-    mp = which.max(initz); # position maximum value
+    
+    mp = which.max(z[dim(z)[1],]); # position maximum value
+    
   }
   
   ps = NULL;
-#  print(mp)
+  
   for(i in (dim(z)[1]-1):1){
-#    output <- c(dim(z)[1],i,mp)
-#    print(output);
+    
+    #print(i);
     ps  = c(ps, mp);
-    ind = (mp-dm):(mp+um);
+    ind = (mp-dm_R):(mp+um_R);
     ind = ind[ind>0]; # preventing values below 0
     ind = ind[ind<dim(z)[2]]; # preventing from large values
     
-    ind = ind[which(y[ind]<initfreq[2])] # preventing indexes to explore region forbidden by initfreq array
-#    ind = ind[which(y[ind]>initfreq[1])] # preventing indexes to explore region forbidden by initfreq array
+    #ind = ind[which(y[ind]<initfreq_R[2])];#preventing indexes to explore region forbidden by initfreq array
+    #ind = ind[which(y[ind]>initfreq_R[1])];#preventing indexes to explore region forbidden by initfreq array
+    
     mp  = ind[which.max(z[i, ind])];
-#    print(z[i,ind])
   }
   
-  ps   = c(ps, mp);
-  ps   = ps[length(ps):1]
-  maxf = y[ps]; # FREQUENCIES FOR LARGEST POWER
-#  print(length(maxf))
-  return(maxf);
+  ps     = c(ps, mp); # adding last mp value
+  ps_R   = ps[length(ps):1]; # reordering
+  maxf_R = y[ps_R]; # FREQUENCIES FOR LARGEST POWER
+  
+  #################
+  ### Left side ###
+  #################
+  
+  # limiting frequencies according to initfreq in y
+  inity = (y >= initfreq_L[1]) & (y <= initfreq_L[2]); # logical vector
+  
+  zn    = dim(z)[1]; # row number (columns in spectrogram) 
+  initz = z[1:m_L, ]; # m last columns of the spectrogram
+  
+  if(m_L != 1){
+    
+    if(initfreq_L[1] != -Inf || initfreq_L[2] != Inf){
+      initz[, !inity] = -Inf; # discarding certain freq according to initfreq
+    }
+    
+    mp    = apply(initz, 1, which.max); # maximum in last m columns of spectrogram
+    mp    = round(median(mp)); # position maximum value
+    
+  }else if(m_L == 1){
+    
+    initz = z[1,]; # last column of spectrogram
+    
+    if(initfreq_L[1] != -Inf || initfreq_L[2] != Inf){
+      initz[!inity] = -Inf;
+    }
+    
+    mp = which.max(z[1,]); # position maximum value
+    
+  }
+  ps = NULL;
+  
+  for(i in 2:dim(z)[1]){
+    
+    #print(i);
+    ps  = c(ps, mp);
+    ind = (mp-dm_L):(mp+um_L);
+    ind = ind[ind>0]; # preventing values below 0
+    ind = ind[ind<dim(z)[2]]; # preventing from large values
+    mp  = ind[which.max(z[i, ind])];
+  }
+  
+  ps_L     = c(ps, mp); # adding last mp value
+  maxf_L = y[ps_L]; # FREQUENCIES FOR LARGEST POWER
+  
+  if(testSlope == TRUE){
+    
+    #####################
+    ### Testing Trend ###
+    #####################
+    
+    # H0: beta < 0
+    # H1: beta > 0
+    
+    n_maxf = length(maxf_R);
+    x_maxf = 1:n_maxf;
+    
+    alpha = 0.001;
+    
+    ### R: starting from the right ###
+    
+    mod_R = lm(maxf_R~x_maxf);
+    fit_R = summary(mod_R);
+    
+    p_R = pt(coef(fit_R)[2, 3], mod_R$df, lower = FALSE); # pvalue
+    
+    if((coef(fit_R)[2, 4] > alpha) || (p_R > alpha)){
+      # H0:beta=0 is not rejected or H0:beta < 0 is not rejected
+      R = FALSE; 
+    }else{ # All ok
+      # H0:beta=0 is rejected and H0:beta<0 is rejected
+      R = TRUE;
+    }
+    
+    #print(p_R); print(coef(fit_R)[2, 4]);
+    
+    ### L: starting from the left ###
+    
+    mod_L = lm(maxf_L~x_maxf);
+    fit_L = summary(mod_L);
+    
+    p_L = pt(coef(fit_L)[2, 3], mod_L$df, lower = FALSE); # pvalue
+    
+    if((coef(fit_L)[2, 4] > alpha) || (p_L > alpha)){
+      L = FALSE; 
+    }else{
+      L = TRUE;
+    }
+    
+    #print(R); print(L);
+    
+    if( R == FALSE && L == FALSE ){
+      cat("None of them work", "\n");
+      warning("Both method find estimated g-modes with negative trend");
+      maxf = rep(NA, n_maxf);
+      
+    }else if( R == TRUE && L == FALSE ){ # only Rigth works
+      cat("only rigth works", "\n");
+      maxf = maxf_R;
+      
+    }else if( R == FALSE && L == TRUE ){ # only Left works
+      
+      cat("only left works", "\n");
+      maxf = maxf_L;
+      
+    }else if( R == TRUE && L == TRUE ){ # Both works
+      
+      cat("Both works", "\n");
+      # median of both maxf
+      ps   = apply(rbind(ps_L, ps_R), 2, function(x) round(median(x)));
+      maxf = y[ps]; 
+    }
+  }else{
+    
+    ps   = apply(rbind(ps_L, ps_R), 2, function(x) round(median(x)));
+    maxf = y[ps]; 
+    
+  }
+  
+  return(list(maxf_med = maxf, maxf_L = maxf_L, maxf_R = maxf_R));
   
 }
 
@@ -111,7 +243,7 @@ movf = function(vec, n, f){
       
       out[i] = f(vec[1:index[i]]); # calculating first values
       
-      out[i + N - aux + 1] = f(vec[index1[i]:N]);
+      out[i + N - aux + 1] = f(vec[index1[i]:N]); # calculating last values
       
     }
     
@@ -196,31 +328,56 @@ ints = function(n, l, p = 00, eq = TRUE){
   return(index);
 }
 
+
 ########################################################################
 covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11, 
-                  um = 3, dm = 3, movBand = 5, timeGmode = NULL, 
-                  thruth_data, actPlot = FALSE){
+                  um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, Inf),
+                  um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(-Inf, Inf),
+                  gmode = "right",
+                  movBand = 5, timeGmode = NULL, 
+                  thruth_data, actPlot = FALSE, limFreq = NULL){
 ########################################################################  
+  
   # data     : dataset as matrix (with no zeros [specPdgrm])
   # mod      : model
-  # l        : interval length in spectrogram (even number)
+  # l        : interval length in spectrogram
   # p        : overlaping percentage in spectrogram
+  # fs       : sampling frequency
   # movGmode : number of steps to smooth estimated g-modes 
-  # um       : define upper neighborhood to find g-modes 
-  # dm       : define lower neighborhood to find g-modes
+  
+  # In 'findGmodes' function
+  # Paremeters for exploration starting from the right side
+  # um_R : up   - to define the neighborhood 
+  # dm_R : down - to define the neighborhood
+  # m_R  : number of intervals used to calculated starting value
+  # initfreq_R: interval to restrict frequency for the starting value
+  
+  # Paremeters for exploration starting from the left side
+  # um_L : up   - to define the neighborhood 
+  # dm_L : down - to define the neighborhood
+  # m_L  : number of intervals used to calculated starting value
+  # initfreq_L: interval to restrict frequency for the starting value
+  
+  # gmode = starting side to estimate g-mode: c("right", "left, "median")
+  
   # movBand  : define the number of points to smooth the band
   # timeGMode: time interval to define g-modes
+  # thruth_data: true ratio and time
   # thruth_data: simulated ratio time evolution where ratio is M/R^2 (g2 mode) or (g3 mode)
-
+  # actPlot  : logical value to produce plot
+  # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
+  
+  ### ###
+  
   # Compute true ratios
   #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
-  true_ratios=thruth_data$x;
+  true_ratios=thruth_data$x
   
   # spectrogram
-  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=TRUE, logPow=TRUE,
+  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
                 zoomFreq=c(0,1)); # generating the spectrogram
   
-  n = length(data$V1);
+  n = length(data$V1); # number of observations
   
   # starting & ending points of the intervals used in the spectrogram
   index = ints(n=n, l=l, p=p); # from psplinePsd
@@ -253,98 +410,236 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     r$z = r$z[out, ];
   }
   
-  maxf = findGmodes(r, um=um, dm=dm);
-  maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
-  points(timefreq, maxf, col = 'black')
+  maxfs = findGmodes(r, um_R, dm_R, um_L, dm_L, m_R, m_L, 
+                     initfreq_R, initfreq_L, testSlope = FALSE);
   
-  # prediction : pred$fit pred$lwr pred$upr
-  new  = data.frame(f = maxf);
-  pred = predict(mod, new, interval = "prediction"); # predictions
+  maxfs = sapply(maxfs,function(x)movf(x, n=movGmode, median));# smoothing g-mode estimates
+  maxfs = as.data.frame(maxfs);
   
-  #plot(new$f,pred[,1])
-  #pred[pred[,2] < 0, 2] = 0; # discarding negative values in CI
-  
-  ### generating band function ### 
-  # n = 1 is equal to system defined above
-  
-  # interpolating lower bound for predicted values
-  fd = approxfun(x = timefreq, y = movf(pred[,2],n=movBand,median), method = "linear",
-                 yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
-  # interpolating upper bound for predicted values
-  fu = approxfun(x = timefreq, y = movf(pred[,3],n=movBand,median), method = "linear",
-                 yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
-  
-  # fd & fu use smooth confidence intervals by using "movf"
-  aux = cbind(true_ratios,                    # true ratios
-              fd(thruth_data$time),  # lower band (using predicted ratios)
-              fu(thruth_data$time)); # upper band (using predicted ratios)
-  
-  # discarding the true values which are out of the range of the predicted values
-  
-  if(actPlot == TRUE){
+  if(is.null(limFreq)){
     
-#    plot(new$f,pred[,1])
-#    points(timefreq,maxf, col = 'green')
-  
-#    plot(thruth_data$time,aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
-#    points(thruth_data$time,aux[,2],col="red",pch=2)
-#    points(thruth_data$time,aux[,3],col="red",pch=3)
-#    leg <- c("true ratio", "pred lower","pred upper")
-#    col=c("black","red","red")
-#    legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
-  
-  # From plotOmeSim
-    yaux = c(true_ratios, pred[,2:3]);
-    plot(thruth_data$time, true_ratios, xlab = "Time",
-       ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n");
-    arrows(timefreq, pred[,2], timefreq, pred[,3], code=3, angle=90,
-         length=0.05, col="gray",pch=3);
-    points(thruth_data$time, true_ratios, col = "black",pch=1);
-    points(timefreq, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
-  
-    leg <- c("true ratio", "pred ","pred uncertainty")
-    col=c("black","red","gray")
-    legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
+    limFreq = Inf; # case in which there is no threshold for frequencies
+    
   }
   
-  # left side
-  disc = which(is.na(aux[,2]));
+  R = list();
   
-  if(length(disc) != 0){
-    aux = aux[-disc,];
+  for(gm in gmode){
+    
+    out1 = NULL; # to store output - coverage probability
+    out2 = NULL; # to store output - stat of residuals
+    
+    if(gm == "left"){
+      
+      maxf = maxfs$maxf_L;
+      
+    }else if(gm == "right"){
+      
+      maxf = maxfs$maxf_R;
+      
+    }else if(gm == "median"){
+      
+      maxf = maxfs$maxf_med;
+      
+    }else{
+      
+      stop("The gmode must be 'left', 'right' or 'median'");
+      
+    }  
+    
+    for(j in limFreq){
+      
+      discFreq = (maxf < j); # positions to be discarded 
+      
+      sfq = sum(discFreq);
+      
+      if(sfq <= 2){ 
+        
+        if(sfq == 0){
+          warning(paste("All frequencies are greater than limFreq", j));
+        }else{
+          warning(paste("only", sfq, "frequencies are greater than limFreq", j));
+        }
+        out1 = rbind(out1, c(NA, NA));
+        out2 = rbind(out2, rep(NA, 7));
+        
+      }else{ # At least 3 g-modes (in maxf) are required to generate the cvvpbb band
+        
+        maxf1     = maxf[discFreq]; # discarding frequencies according to limFreq
+        timefreq1 = timefreq[discFreq]; # discarding time points
+        
+        # defining true ratios according to limfreq 
+        timeTR    = thruth_data$time; 
+        discTR    = (timeTR >= min(timefreq1)) & (timeTR <= max(timefreq1));
+        timeTR    = timeTR[discTR];  
+        TR        = true_ratios[discTR]; # ratios in the interval
+        
+        # prediction : pred$fit pred$lwr pred$upr
+        new  = data.frame(f = maxf1);
+        
+        if(any(class(mod) == "lm")){
+          
+          pred = predict(mod, new, interval = "prediction"); # predictions
+          
+        }else if(any(class(mod) == "lmvar")){
+          
+          f    = maxf1;
+          
+          ### mu ###
+          x = colnames(mod$X_mu)
+          if(x[1] == "(Intercept)"){
+            
+            X_mu = apply(as.matrix(x[-1]),1, function(y)eval(parse(text = y)));
+            colnames(X_mu) = colnames(mod$X_mu)[-1];
+            
+          }else{
+            
+            X_mu = apply(as.matrix(x), 1, function(y)eval(parse(text = y)));
+            colnames(X_mu) = colnames(mod$X_mu);
+          }
+          
+          ### sigma ###
+          x = colnames(mod$X_s);
+          if(x[1] == "(Intercept_s)"){
+            
+            X_s = apply(as.matrix(x[-1]),1, function(y)eval(parse(text = y)));
+            colnames(X_s)  = colnames(mod$X_s)[-1];
+            
+          }else{
+            
+            X_s = apply(as.matrix(x), 1, function(y)eval(parse(text = y)));
+            colnames(X_s)  = colnames(mod$X_s);
+            
+          }
+          
+          pred = predict(mod, X_mu = X_mu, X_sigma = X_s, 
+                         interval = "prediction", sigma = FALSE); # predictions
+        }
+        
+        #plot(new$f,pred[,1])
+        #pred[pred[,2] < 0, 2] = 0; # discarding negative values in CI
+        
+        ### generating band function ### 
+        
+        # interpolating lower bound for predicted values
+        fd = approxfun(x = timefreq1, y = movf(pred[,2],n=movBand,median), method = "linear",
+                       yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
+        # interpolating upper bound for predicted values
+        fu = approxfun(x = timefreq1, y = movf(pred[,3],n=movBand,median), method = "linear",
+                       yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
+        # interpolating point estimates
+        fm = approxfun(x = timefreq1, y = movf(pred[,1],n=movBand,median), method = "linear",
+                       yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
+        
+        # fd & fu use smooth confidence intervals by using "movf"
+        aux = cbind(TR,          # true ratios
+                    fd(timeTR),  # lower band (using predicted ratios)
+                    fu(timeTR)); # upper band (using predicted ratios)
+        
+        if(actPlot == TRUE){
+          
+          #plot(new$f,pred[,1])
+          #points(timefreq,maxf, col = 'green')
+          
+          #plot(thruth_data$time, aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
+          #points(thruth_data$time,aux[,2],col="red",pch=2)
+          #points(thruth_data$time,aux[,3],col="red",pch=3)
+          #leg <- c("true ratio", "pred lower","pred upper")
+          #col=c("black","red","red")
+          #legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
+          
+          # From plotOmeSim
+          yaux = c(true_ratios, pred[,2:3]);
+          plot(thruth_data$time, true_ratios, xlab = "Time",
+               ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
+               main = paste("Frequency cutoff", j,"-",gm, "gmode"));
+          arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
+                 length=0.05, col="gray",pch=3);
+          points(thruth_data$time, true_ratios, col = "black",pch=1);
+          points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
+          
+          leg <- c("true ratio", "pred ","pred uncertainty");
+          col <- c("black","red","gray");
+          legend("topleft",legend=leg,cex=.8,col=col,pch=c(1,2,3));
+          
+        } # end plot
+        
+        # discarding the true values which are out1 of the range of the predicted values
+        
+        # left side
+        disc = which(is.na(aux[,2]));
+        
+        if(length(disc) != 0){
+          aux = aux[-disc,];
+        }
+        
+        # right side
+        disc = which(is.na(aux[,3]));
+        
+        if(length(disc) != 0){
+          aux = aux[-disc,];
+        }
+        
+        # testing if the true ratios are inside the bands
+        prop = apply(aux, 1, 
+                     function(x){
+                       if((x[1]>= x[2]) && (x[1] <= x[3])){
+                         return(1);
+                       }else{
+                         return(0);
+                       }
+                     });
+        
+        aux[aux[,2]<0,2] = 0; # it replaces negative values in lower limit
+        
+        l = aux[,3] - aux[,2];
+        p = mean(prop);
+        
+        out1 = rbind(out1, c(p, median(l))); # covpbb & medBandWidth
+        
+        # Residuals
+        res  = TR - fm(timeTR); # true_value - estimate
+        res  = c(summary(res), sd(res));
+        out2 = rbind(out2, res);
+        
+      } # end 'all(discFreq)'
+      
+    } # end loop
+    
+    if(length(limFreq) == 1){ # single estimate
+      
+      colnames(out1) = c("covpbb", "medBandWidth"); 
+      
+    }else{ # multiple estimates
+      
+      out1 = cbind(limFreq, out1);
+      out2 = cbind(limFreq, out2);
+      colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
+      
+    }
+    
+    colnames(out2)[length(colnames(out2))] = "sd";
+    rownames(out2) = NULL;
+    
+    R[[gm]] = list(covpbb = out1, residual = out2);
+    
   }
   
-  # right side
-  disc = which(is.na(aux[,3]));
-  
-  if(length(disc) != 0){
-    aux = aux[-disc,];
+  if(length(gmode) == 1){
+    
+    R = R[[1]];
+    
   }
   
-  # testing if the true ratios are inside the bands
-  prop = apply(aux, 1, 
-               function(x){
-                 if((x[1]>= x[2]) && (x[1] <= x[3])){
-                   return(1);
-                 }else{
-                   return(0);
-                 }
-               });
-  
-  aux[aux[,2]<0,2] = 0; # it replaces negative values in lower limit
-  
-  l = aux[,3] - aux[,2];
-  p = mean(prop);
-  
-  return(list(covpbb = p, medBandWidth = median(l)));
+  return(R);
   
 }
 
+# THIS FUNCTION MUST BE UPDATED
 
 ########################################################################
 repcovpbb = function(wvf, duration, ampl, fcut,
                      mod, N, snr = NULL, movGmode = 11, um = 3, dm = 3,
-                     m = 1, initfreq,
                      movBand = 5, timeGmode = NULL, l=200, p=90, fs=16384, limFreq=NULL,
                      thruth_data){
 ########################################################################  
@@ -352,9 +647,9 @@ repcovpbb = function(wvf, duration, ampl, fcut,
   # mod  : lm object
   # N    : number of replications
   # ampl : distances (scalar or vector)
-
-  if(length(ampl) == 1){
   
+  if(length(ampl) == 1){
+    
     out_cp = NULL;
     out_bl = NULL;
     
@@ -364,10 +659,9 @@ repcovpbb = function(wvf, duration, ampl, fcut,
       if (is.null(limFreq)){
         aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
                      thruth_data=thruth_data, actPlot = FALSE);
-      }else{
-        print(m)
-        aux = covpbb1(noisydata, mod, l, p, fs, um, dm, m, initfreq,
-                     thruth_data=thruth_data, actPlot = FALSE, limFreq);
+      }else{        
+        aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
+                     thruth_data=thruth_data, actPlot = FALSE);
       }
       print(aux$covpbb)        
       out_cp = c(out_cp, aux$covpbb);
@@ -395,11 +689,10 @@ repcovpbb = function(wvf, duration, ampl, fcut,
           aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
                        thruth_data=thruth_data, actPlot = FALSE);
         }else{        
-          aux = covpbb1(noisydata, mod, l, p, fs, um, dm,
-                        m, initFreq,
+          aux = covpbb1(noisydata, mod, l, p, fs, um, dm, 
                         thruth_data=thruth_data, actPlot = FALSE, limFreq);
         }
-
+        
         #print(aux$covpbb)        
         aux_cp = c(aux_cp, aux$covpbb);
         aux_bl = c(aux_bl, aux$medBandWidth);
@@ -426,313 +719,6 @@ repcovpbb = function(wvf, duration, ampl, fcut,
 }
 
 
-
-
-########################################################################
-covpbb1 = function(data, mod, l=200, p=90, fs=16384, movGmode = 11, 
-                   um = 3, dm = 3, m = 8, initfreq = c(-Inf, Inf),
-                   movBand = 5, timeGmode = NULL, 
-                   thruth_data, actPlot = FALSE, limFreq = NULL){
-########################################################################  
-  
-  # data     : dataset as matrix (with no zeros [specPdgrm])
-  # mod      : model
-  # l        : interval length in spectrogram
-  # p        : overlaping percentage in spectrogram
-  # fs       : sampling frequency
-  # movGmode : number of steps to smooth estimated g-modes 
-  # 
-  # movBand  : define the number of points to smooth the band
-  # timeGMode: time interval to define g-modes
-  # thruth_data: true ratio and time
-  # thruth_data: simulated ratio time evolution where ratio is M/R^2 (g2 mode) or (g3 mode)
-  # actPlot  : logical value to produce plot
-  # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
-  
-  # In 'findGmodes' function
-  # um : up   - to define the neighborhood to find g-modes 
-  # dm : down - to define the neighborhood to find g-modes 
-  # m  : number of intervals used to calculated starting value
-  # initfreq: interval to restrict frequency for the starting value
-  
-  # Compute true ratios
-  #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
-  true_ratios=thruth_data$x
-  
-  # spectrogram
-  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=TRUE, logPow=TRUE,
-                zoomFreq=c(0,1)); # generating the spectrogram
-  
-  n = length(data$V1); # number of observations
-
-  # starting & ending points of the intervals used in the spectrogram
-  index = ints(n=n, l=l, p=p); # from psplinePsd
-  
-  # centred point for even "l"
-  mindx = index + cbind(rep(l/2 -1, dim(index)[1]), rep(-(l/2-1), dim(index)[1]));
-  
-  # Ajusting data
-  timedata = seq(from=data$V1[1], to=data$V1[n], length = n);
-  
-  # mean time (centred point) for our g-mode estimates
-  timefreq = apply(mindx, 1, function(x) mean(timedata[c(x[1], x[2])]) );
-
-  # g-modes
-  if( !is.null(timeGmode)){
-    #timeGmode = data0[c(1,length(data0[,1])), 1];
-    out = apply(as.matrix(timefreq), 1, 
-                function(x){
-                  if((x >= timeGmode[1]) & (x <= timeGmode[2])){
-                    return(TRUE);
-                  }else{
-                    return(FALSE);
-                  }
-                });
-    
-    #maxf     = maxf[out];
-    timefreq = timefreq[out];
-    
-    r$x = r$x[out];
-    r$z = r$z[out, ];
-  }
-  
-  maxf = findGmodes(r, um=um, dm=dm, m, initfreq);
-  maxf = movf(maxf, movGmode, median); # smoothing g-mode estimates
-
-  points(r$x,maxf, col = 'black')
-#  points(timefreq,maxf, col = 'black')
-  
-  if(is.null(limFreq)){
-    
-    limFreq = Inf; # case in which there is no threshold for frequencies
-    
-  }
-  
-  out1 = NULL; # to store output - coverage probability
-  out2 = NULL; # to store output - stat of residuals
-  
-  for(j in limFreq){
-    
-    discFreq = (maxf < j); # positions to be discarded 
-    
-    sfq = sum(discFreq);
-    
-    if(sfq <= 2){ 
-      
-      if(sfq == 0){
-        warning(paste("All frequencies are greater than limFreq", j));
-      }else{
-        warning(paste("only", sfq, "frequencies are greater than limFreq", j));
-      }
-      out1 = rbind(out1, c(NA, NA));
-      out2 = rbind(out2, rep(NA, 7));
-      
-    }else{ # At least 3 g-modes (in maxf) are required to generate the cvvpbb band
-      
-      maxf1     = maxf[discFreq]; # discarding frequencies according to limFreq
-      timefreq1 = timefreq[discFreq]; # discarding time points
-      
-      # defining true ratios according to limfreq 
-      timeTR    = thruth_data$time; 
-      discTR    = (timeTR >= min(timefreq1)) & (timeTR <= max(timefreq1));
-      timeTR    = timeTR[discTR];  
-      TR        = true_ratios[discTR]; # ratios in the interval
-      
-      # prediction : pred$fit pred$lwr pred$upr
-      new  = data.frame(f = maxf1);
-      pred = predict(mod, new, interval = "prediction"); # predictions
-      
-      #plot(new$f,pred[,1])
-      #pred[pred[,2] < 0, 2] = 0; # discarding negative values in CI
-      
-      ### generating band function ### 
-      # n = 1 is equal to system defined above
-      
-      # interpolating lower bound for predicted values
-      fd = approxfun(x = timefreq1, y = movf(pred[,2],n=movBand,median), method = "linear",
-                     yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
-      # interpolating upper bound for predicted values
-      fu = approxfun(x = timefreq1, y = movf(pred[,3],n=movBand,median), method = "linear",
-                     yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
-      # interpolating point estimates
-      fm = approxfun(x = timefreq1, y = movf(pred[,1],n=movBand,median), method = "linear",
-                     yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
-      
-      # fd & fu use smooth confidence intervals by using "movf"
-      aux = cbind(TR,          # true ratios
-                  fd(timeTR),  # lower band (using predicted ratios)
-                  fu(timeTR)); # upper band (using predicted ratios)
-      
-      if(actPlot == TRUE){
-        
-        #plot(new$f,pred[,1])
-        #points(timefreq,maxf, col = 'green')
-        
-        #plot(thruth_data$time, aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
-        #points(thruth_data$time,aux[,2],col="red",pch=2)
-        #points(thruth_data$time,aux[,3],col="red",pch=3)
-        #leg <- c("true ratio", "pred lower","pred upper")
-        #col=c("black","red","red")
-        #legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
-        
-        # From plotOmeSim
-        yaux = c(true_ratios, pred[,2:3]);
-        plot(thruth_data$time, true_ratios, xlab = "Time",
-             ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
-             main = paste("Frequency cutoff", j));
-        arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
-               length=0.05, col="gray",pch=3);
-        points(thruth_data$time, true_ratios, col = "black",pch=1);
-        points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
-        
-        leg <- c("true ratio", "pred ","pred uncertainty");
-        col <- c("black","red","gray");
-        legend("topleft",legend=leg,cex=.8,col=col,pch=c(1,2,3));
-        
-      } # end plot
-      
-      # discarding the true values which are out1 of the range of the predicted values
-      
-      # left side
-      disc = which(is.na(aux[,2]));
-      
-      if(length(disc) != 0){
-        aux = aux[-disc,];
-      }
-      
-      # right side
-      disc = which(is.na(aux[,3]));
-      
-      if(length(disc) != 0){
-        aux = aux[-disc,];
-      }
-      
-      # testing if the true ratios are inside the bands
-      prop = apply(aux, 1, 
-                   function(x){
-                     if((x[1]>= x[2]) && (x[1] <= x[3])){
-                       return(1);
-                     }else{
-                       return(0);
-                     }
-                   });
-      
-      aux[aux[,2]<0,2] = 0; # it replaces negative values in lower limit
-      
-      l = aux[,3] - aux[,2];
-      p = mean(prop);
-      
-      out1 = rbind(out1, c(p, median(l))); # covpbb & medBandWidth
-      
-      # Residuals
-      res  = TR - fm(timeTR); # true_value - estimate
-      res  = c(summary(res), sd(res));
-      out2 = rbind(out2, res);
-      
-    } # end 'all(discFreq)'
-    
-  } # end loop
-  
-  if(length(limFreq) == 1){ # single estimate
-    
-    colnames(out1) = c("covpbb", "medBandWidth"); 
-    
-  }else{ # multiple estimates
-    
-    out1 = cbind(limFreq, out1);
-    out2 = cbind(limFreq, out2);
-    colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
-    
-  }
-  
-  colnames(out2)[length(colnames(out2))] = "sd";
-  rownames(out2) = NULL;
-  
-  return(list(covpbb = out1, residual = out2));
-  
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##### Functions not yet checked by MAB
-
-
-
-repcovpbbWN = function(data, mod, N, SDs, movGmode = 11, um, dm, movBand, 
-                       timeGmode, l=200, p=90, fs=16384){
-  
-  # calculate coverage probabilities for the standarized data (+ white noise)
-  
-  newdata = data$V2;
-  newdata = (newdata - mean(newdata)) / sd(newdata);
-  cat("The data has been standarised", "\n")
-  
-  n       = length(newdata);
-  
-  if(length(SDs) == 1){
-    
-    out = NULL;
-    
-    for(i in 1:N){
-      
-      # Generate noise
-      Y = rnorm(n, sd = SDs);
-      
-      # noisy data
-      noisydata$V2 = newdata + Y; # signal + noise
-      hpf = 50; # high pass filter
-      noisydata$V2 = ffilter(noisydata$V2, f = fs, from = hpf);
-      
-      out = c(out, covpbb(noisydata, mod=mod, l=l, p=p, fs=fs, movGmode=movGmode, 
-                          um=um, dm=dm, movBand=movBand, timeGmode=timeGmode));
-      
-    }
-    
-  }else if(length(SDs) > 1){
-    
-    out = list();
-    
-    for(s in SDs){
-      
-      cat(paste("sd =", s, "\n"));
-      
-      aux = NULL;
-      
-      for(i in 1:N){
-        
-        # Generate noise
-        Y = rnorm(n, sd = s);
-        
-        # noisy data
-        noisydata$V2 = newdata + Y; # signal + noise
-        hpf = 50; # high pass filter
-        noisydata$V2 = ffilter(noisydata$V2, f = fs, from = hpf);
-        
-        aux = c(aux, covpbb(noisydata, mod=mod, l=l, p=p, fs=fs, movGmode=movGmode, 
-                            um=um, dm=dm, movBand=movBand, timeGmode=timeGmode));
-        
-      }
-      
-      out[[paste(s)]] = aux;
-      
-    }
-  }
-  
-  return(out)
-  
-}
 
 ##########################
 ### BAYESIAN functions ###
