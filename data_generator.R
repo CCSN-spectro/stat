@@ -1,14 +1,24 @@
+library ("stats")
 library ("signal")
 library ("seewave")
 
+
 ########################################################################
-data_generator = function (fs, duration, wvf.df=NULL, ampl=1, fcut=15, actPlot=TRUE){
+data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering = "HP", fcut=15, actPlot=TRUE){
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
   # wvf: dataframe (V1=time, V2=h(t)) that contains the signal waveform sampled at fs
   # ampl: multiplication factor to change the source distance
-  # fcut: lower frequency cutoff of the high pass filter. If NULL no filter.
+  # fcut: lower frequency cutoff of the high pass filter. If NULL no HP filter.
+  # filtering: "HP" --> fcut must be set
+  #            "whitening" --> fcut is not used
+  #            default is "HP"
+  # 
+  # output: d$t: time vector
+  #         d$x: noise+signal
+  #         d$y: filtered (noise+signal)
+  
   
   # check that duration is an integer > 0
 
@@ -40,21 +50,23 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, fcut=15, actPlot=T
   }
   
   # Noise generation
-  freq2 = fs*fftfreq(n)   # two-sided frequency vector
+  freq2 = fs*fftfreq(n)          # two-sided frequency vector
   freq1=freq2[1:int(n/2)]        # one-sided frequency vector
-  psd2=aLIGO_PSD_new(freq2,2)    # two-sided PSD          
+  psd=aLIGO_PSD_new(freq2,2)     # two-sided PSD          
 
   T = seq(1, n, by = 1)  
-  X = rnorm(n, mean=0, sd=1);          # Gaussian white noise
+  X = rnorm(n, mean=0, sd=1);           # Gaussian white noise
   XX = sqrt(fs) * fft(X) / (n*sqrt(n)); # FFT computing and normalization
-  XXX = XX*sqrt(psd2);                  # Coloring
+  XXX = XX*sqrt(psd);                   # Coloring
   Y = fft(XXX, inverse = TRUE);         # FFT inverse
   Y = Re(Y)*sqrt(n);                    # noise in time domain
 
-  if (actPlot==TRUE){  
-
-  }
-
+  X1 = rnorm(n, mean=0, sd=1);            # Gaussian white noise
+  XX1 = sqrt(fs) * fft(X1) / (n*sqrt(n)); # FFT computing and normalization
+  XXX1 = XX1*sqrt(psd);                  # Coloring
+  Y1 = fft(XXX1, inverse = TRUE);         # FFT inverse
+  Y1 = Re(Y1)*sqrt(n);                    # noise in time domain
+  
   # Signal addition (centered at the middle of the data vector to avoid filtering leakage
   # at the beggining and end).
   if (wvf_opt==1){
@@ -65,11 +77,23 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, fcut=15, actPlot=T
     }
   }
 
-  # filter noise + signal
-  # filtfilt : zero phase filter (forward& backward)
-  myfilter=butter(n=4,W=fcut/(fs/2),type="high")
-  YY=filtfilt(filt=myfilter,x=Y)          
+  if (filtering == "HP"){
+    if (is.null(fcut)) {
+      stop("fcut is not defined")
+    }
+    # filter noise + signal 
+    # filtfilt : zero phase filter (forward& backward)
+    myfilter=butter(n=4,W=fcut/(fs/2),type="high")
+    YY=filtfilt(filt=myfilter,x=Y)          
+  }
 
+  if (filtering == "whitening"){
+    # whiten the data
+    ar_model <- stats::ar(Y1,order.max=2, aic=FALSE ,method=c("yule-walker"), demean=TRUE);
+    b <- stats::filter(x=Y, filt=c(1, -ar_model$ar[1], -ar_model$ar[2]), method="convolution",  sides = 1);
+    YY=b
+  }
+  
   # select the orginal data size
   Tf = wvf.df$V1
   Yf = seq(1, n_0, by = 1)
@@ -82,12 +106,14 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, fcut=15, actPlot=T
     
   if (actPlot==TRUE){  
     ts.plot(Y); # noise only
-    points(T,YY,col="red",type="l",pch=1,panel.first = grid()); # (noise + signal) filtered
+    points(T, Y, col="black", type="l", pch=1, panel.first = grid())
+    points(T,YY,col="red",type="l",pch=2); # (noise + signal) filtered
     T_wvf=seq(ind1,ind1+wvf_size-1,by=1)
     points(T_wvf,(wvf.df$V2)*ampl,col="green",type="l",pch=3);  # signal only
+#    points(T,Y1,col="cyan",type="l")
 #    points(Tf,YYf,col="green",type="l",pch=3);  # signal only
-    leg = c("noise+signal HP filtered", "signal only")
-    col = c("red","green")
+    leg = c("noise", "(noise+signal) HP filtered", "signal only")
+    col = c("black","red","green")
     legend(x=0,y=-5*10^-21,legend=leg,cex=.8,col=col,pch=c(1,3))
   }
 

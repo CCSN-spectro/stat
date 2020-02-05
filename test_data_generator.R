@@ -14,5 +14,9 @@ signalx=decimate(s20$V1,16384/fs)
 wvf.df = data.frame("V1"=signalx,"V2"=signaly)
 
 ### generate noisy data and signal buried ###
-d = data_generator(fs, duration, wvf.df, ampl, fcut, actPlot=TRUE)
+d = data_generator(fs, duration, wvf.df, ampl, filtering="whitening", fcut=fcut, actPlot=TRUE)
+sprintf("noise and signal is whitened. Standard deviation: %g", sqrt(var(d$y)))
+
+dp = data_generator(fs, duration, wvf.df, ampl, filtering="HP", fcut=fcut, actPlot=TRUE)
+sprintf("noise and signal is high passed. Standard deviation: %g", sqrt(var(dp$y)))
 
