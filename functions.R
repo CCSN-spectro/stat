@@ -654,7 +654,7 @@ repcovpbb = function(wvf, duration, ampl, fcut,
     out_bl = NULL;
     
     for(i in 1:N){
-      noisydata = data_generator(fs, duration, wvf, ampl, fcut, actPlot=FALSE);
+      noisydata = data_generator(fs, duration, wvf, ampl, filtering = "HP", fcut=fcut, actPlot=FALSE);
       noisydata = data.frame("V1"=noisydata$t,"V2"=noisydata$y);
       if (is.null(limFreq)){
         aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
@@ -682,7 +682,7 @@ repcovpbb = function(wvf, duration, ampl, fcut,
       
       for(i in 1:N){
         
-        noisydata = data_generator(fs, duration, wvf, ampl = j, fcut, actPlot=FALSE);
+        noisydata = data_generator(fs, duration, wvf, ampl = j, filtering = "HP", fcut=fcut, actPlot=FALSE);
         noisydata = data.frame("V1"=noisydata$t,"V2"=noisydata$y);
         
         if (is.null(limFreq)){
