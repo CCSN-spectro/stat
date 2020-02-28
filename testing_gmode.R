@@ -60,7 +60,7 @@ i = 8;
 d = 2;
 #for(i in 51:80){
 set.seed(i);
-newdata = data_generator(fs, duration, wvf.df, ampl = 10/d, fcut, actPlot=FALSE);
+newdata = data_generator(fs, duration, wvf.df, ampl = 10/d, filtering="HP", fcut=fcut, actPlot=FALSE);
 noisydata = data.frame("V1"=newdata$t, "V2"=newdata$y);
 r = specPdgrm(noisydata$V2,noisydata$V1, l=200, p=90, fs=fs, actPlot = TRUE, 
               logPow = T, zoomFreq=c(0,1)); # generating the spectrogram
