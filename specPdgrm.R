@@ -98,7 +98,7 @@ pdgrm = function(data, ylog = TRUE, actPlot = TRUE, main = NULL, ...){
 ###################
 
 ########################################################################
-specPdgrm = function(data, time = NULL, l, p, fs = 16384, actPlot = TRUE, 
+specPdgrm = function(data, time = NULL, l, p, fs = NULL, actPlot = TRUE, 
                      logPow = TRUE, zoomFreq = c(0,1), main  = NULL,
                      method = "ar", y = NULL){
   ########################################################################
