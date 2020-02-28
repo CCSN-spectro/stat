@@ -368,10 +368,8 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   # limFreq  : specifies upper threshold (in Hz) for the estimated g-modes
   
   ### ###
-  
-  # Compute true ratios
-  #true_ratios = Obergaunlinguer_data$Mpns / (Obergaunlinguer_data$Rpns^(2))
-  true_ratios=thruth_data$x
+  true_time = thruth_data$time; 
+  true_ratios = thruth_data$x
   
   # spectrogram
   r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
@@ -415,6 +413,11 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   maxfs = sapply(maxfs,function(x)movf(x, n=movGmode, median));# smoothing g-mode estimates
   maxfs = as.data.frame(maxfs);
+  if(actPlot == TRUE){
+    points(timefreq, maxfs$maxf_med, col='black')
+    #arrows(timefreq, maxfs$maxf_L, timefreq, maxfs$maxf_R, code=3, angle=90,
+    #       length=0.05, col="gray");
+  }
   
   if(is.null(limFreq)){
     
@@ -428,6 +431,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     
     out1 = NULL; # to store output - coverage probability
     out2 = NULL; # to store output - stat of residuals
+    out3 = NULL; # to store output - chi2
     
     if(gm == "left"){
       
@@ -448,43 +452,38 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     }  
     
     for(j in limFreq){
-      
-      discFreq = (maxf < j); # positions to be discarded 
+      #print(j)
+      discFreq = (maxf < j); # positions to keep 
       
       sfq = sum(discFreq);
-      
+    
       if(sfq <= 2){ 
-        
         if(sfq == 0){
           warning(paste("All frequencies are greater than limFreq", j));
         }else{
-          warning(paste("only", sfq, "frequencies are greater than limFreq", j));
+          warning(paste("Only", sfq, "frequency is lower than limFreq", j));
         }
         out1 = rbind(out1, c(NA, NA));
         out2 = rbind(out2, rep(NA, 7));
-        
-      }else{ # At least 3 g-modes (in maxf) are required to generate the cvvpbb band
-        
-        maxf1     = maxf[discFreq]; # discarding frequencies according to limFreq
+        out3 = rbind(out3, c(NA, NA));
+      }
+      else { # At least 3 g-modes (in maxf) are required to generate the cvvpbb band
+        maxf1     = maxf[discFreq];     # discarding frequencies according to limFreq
         timefreq1 = timefreq[discFreq]; # discarding time points
-        
-        # defining true ratios according to limfreq 
-        timeTR    = thruth_data$time; 
-        discTR    = (timeTR >= min(timefreq1)) & (timeTR <= max(timefreq1));
-        timeTR    = timeTR[discTR];  
-        TR        = true_ratios[discTR]; # ratios in the interval
+
+        # defining true ratios in the band limit given by limfreq 
+        discTime = (true_time >= min(timefreq1)) & (true_time <= max(timefreq1));
+        true_time1 = true_time[discTime];  
+        true_ratio1 = true_ratios[discTime];
         
         # prediction : pred$fit pred$lwr pred$upr
         new  = data.frame(f = maxf1);
         
         if(any(class(mod) == "lm")){
-          
           pred = predict(mod, new, interval = "prediction"); # predictions
-          
         }else if(any(class(mod) == "lmvar")){
-          
           f    = maxf1;
-          
+  
           ### mu ###
           x = colnames(mod$X_mu)
           if(x[1] == "(Intercept)"){
@@ -516,9 +515,6 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
                          interval = "prediction", sigma = FALSE); # predictions
         }
         
-        #plot(new$f,pred[,1])
-        #pred[pred[,2] < 0, 2] = 0; # discarding negative values in CI
-        
         ### generating band function ### 
         
         # interpolating lower bound for predicted values
@@ -532,31 +528,21 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
                        yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
         
         # fd & fu use smooth confidence intervals by using "movf"
-        aux = cbind(TR,          # true ratios
-                    fd(timeTR),  # lower band (using predicted ratios)
-                    fu(timeTR)); # upper band (using predicted ratios)
+        aux = cbind(true_ratio1,          # true ratios
+                    fd(true_time1),  # lower band (using predicted ratios)
+                    fu(true_time1)); # upper band (using predicted ratios)
         
         if(actPlot == TRUE){
-          
-          #plot(new$f,pred[,1])
-          #points(timefreq,maxf, col = 'green')
-          
-          #plot(thruth_data$time, aux[,1],xlab="time[s]",ylab="r",ylim=c(-0.000515,0.0037809),pch=1)
-          #points(thruth_data$time,aux[,2],col="red",pch=2)
-          #points(thruth_data$time,aux[,3],col="red",pch=3)
-          #leg <- c("true ratio", "pred lower","pred upper")
-          #col=c("black","red","red")
-          #legend(x=.25,y=0.0037,legend=leg,cex=.8,col=col,pch=c(1,2,3))
-          
-          # From plotOmeSim
+         
           yaux = c(true_ratios, pred[,2:3]);
-          plot(thruth_data$time, true_ratios, xlab = "Time",
-               ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
+
+          plot(true_time, true_ratios, xlab = "Time",
+               ylab = "Ratio", ylim = c(min(yaux), max(yaux)), xlim=c(0,1.5), type = "n",
                main = paste("Frequency cutoff", j,"-",gm, "gmode"));
           arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
                  length=0.05, col="gray",pch=3);
-          points(thruth_data$time, true_ratios, col = "black",pch=1);
-          points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3,pch=2);
+          points(true_time, true_ratios, col = "black", pch=1);
+          points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3, pch=2);
           
           leg <- c("true ratio", "pred ","pred uncertainty");
           col <- c("black","red","gray");
@@ -564,7 +550,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
           
         } # end plot
         
-        # discarding the true values which are out1 of the range of the predicted values
+        # discarding the true values which are out of the range of the predicted values
         
         # left side
         disc = which(is.na(aux[,2]));
@@ -594,43 +580,44 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         
         l = aux[,3] - aux[,2];
         p = mean(prop);
-        
         out1 = rbind(out1, c(p, median(l))); # covpbb & medBandWidth
         
         # Residuals
-        res  = TR - fm(timeTR); # true_value - estimate
-        res  = c(summary(res), sd(res));
-        out2 = rbind(out2, res);
+        res  = true_ratio1 - fm(true_time1); # true_value - estimate
+        out2 = rbind(out2, c(summary(res), sd(res)));
         
+        # chi2
+        chi2<-sum((true_ratio1 - fm(true_time1))^2/true_ratio1)
+        chi2_bis<-sum((true_ratio1 - fm(true_time1))^2/(fu(true_time1) - fd(true_time1)))
+        out3 = rbind(out3, c(chi2, chi2_bis));
+        
+        if(actPlot == TRUE){
+          
+          plot(true_time1, res, xlab = "Time",
+               ylab = "Residual", ylim = c(-8e-4, 8e-4), xlim=c(0,max(true_time1)*1.1), type = "n",
+               main = paste("Frequency cutoff", j,"-",gm, "gmode"));
+          points(true_time1, res, col = "black", pch=1);
+        }
       } # end 'all(discFreq)'
       
     } # end loop
     
-    if(length(limFreq) == 1){ # single estimate
-      
-      colnames(out1) = c("covpbb", "medBandWidth"); 
-      
-    }else{ # multiple estimates
-      
-      out1 = cbind(limFreq, out1);
-      out2 = cbind(limFreq, out2);
-      colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
-      
-    }
-    
+   
+    # colnames      
+    out1 = cbind(limFreq, out1);
+    out2 = cbind(limFreq, out2);
+    out3 = cbind(limFreq, out3);
+    colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
     colnames(out2)[length(colnames(out2))] = "sd";
-    rownames(out2) = NULL;
+    colnames(out3) = c("limFreq", "chi2 goodfit", "chi2")
     
-    R[[gm]] = list(covpbb = out1, residual = out2);
+    R[[gm]] = list(covpbb = out1, residual = out2, chi2 = out3);
     
   }
   
   if(length(gmode) == 1){
-    
     R = R[[1]];
-    
   }
-  
   return(R);
   
 }
@@ -663,7 +650,6 @@ repcovpbb = function(wvf, duration, ampl, fcut,
         aux = covpbb(noisydata, mod, l, p, fs, um, dm, 
                      thruth_data=thruth_data, actPlot = FALSE);
       }
-      print(aux$covpbb)        
       out_cp = c(out_cp, aux$covpbb);
       out_bl = c(out_bl, aux$medBandWidth);      
     }
