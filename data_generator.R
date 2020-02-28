@@ -1,10 +1,11 @@
 library ("stats")
 library ("signal")
 library ("seewave")
+library("psd")
 
 
 ########################################################################
-data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering = "HP", fcut=15, actPlot=TRUE){
+data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering, fcut, actPlot=TRUE){
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
@@ -14,6 +15,7 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering = "HP", 
   # filtering: "HP" --> fcut must be set
   #            "whitening" --> fcut is not used
   #            default is "HP"
+  # The wvf is centered in the noise vector
   # 
   # output: d$t: time vector
   #         d$x: noise+signal
@@ -39,10 +41,13 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering = "HP", 
       print("The waveform length is larger than the requested data vector size. Please check")
       return(NULL)
     }
-    if (2*wvf_size>n){
-      #print("vector's duration is doubled")
+
+#    if (2*wvf_size>n){
+#      print("The internal vector's duration is doubled to avoid filtering border effect.")
+#      print("The output vector size remains.")
       n=2*duration*fs
-    }
+#    }
+
     if (wvf_size%%2>0){
       print("The waveform length should be an even number. Please check")
       return(NULL)
@@ -51,10 +56,12 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering = "HP", 
   
   # Noise generation
   freq2 = fs*fftfreq(n)          # two-sided frequency vector
+  freq2[1]=0.001                 # to avoid plotting pb in logscale
   freq1=freq2[1:int(n/2)]        # one-sided frequency vector
   psd=aLIGO_PSD_new(freq2,2)     # two-sided PSD          
 
   T = seq(1, n, by = 1)  
+
   X = rnorm(n, mean=0, sd=1);           # Gaussian white noise
   XX = sqrt(fs) * fft(X) / (n*sqrt(n)); # FFT computing and normalization
   XXX = XX*sqrt(psd);                   # Coloring
@@ -63,7 +70,7 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering = "HP", 
 
   X1 = rnorm(n, mean=0, sd=1);            # Gaussian white noise
   XX1 = sqrt(fs) * fft(X1) / (n*sqrt(n)); # FFT computing and normalization
-  XXX1 = XX1*sqrt(psd);                  # Coloring
+  XXX1 = XX1*sqrt(psd);                   # Coloring
   Y1 = fft(XXX1, inverse = TRUE);         # FFT inverse
   Y1 = Re(Y1)*sqrt(n);                    # noise in time domain
   
@@ -86,35 +93,73 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering = "HP", 
     myfilter=butter(n=4,W=fcut/(fs/2),type="high")
     YY=filtfilt(filt=myfilter,x=Y)          
   }
+  else 
+    if (filtering == "whitening"){
+      # whiten the data
+      ar_model <- stats::ar(Y1,order.max=3, aic=FALSE ,method=c("yule-walker"), demean=TRUE);
+      b <- stats::filter(x=Y, filt=c(1, -ar_model$ar[1], -ar_model$ar[2], -ar_model$ar[3]), method="convolution",  sides = 1);
+      YY=b
+    }
+    else if (filtering == "whitening_bis"){
+      # compute the PSD
+      psdest <- pspectrum(Y1,Y1.frqsamp=fs, ntap.init=6, Nyquist.normalize = TRUE, plot=FALSE,verbose = FALSE)
+      psdwhitening=sqrt(fs)*psdest$spec/(n*sqrt(n))
+      
+      a = sqrt(fs) * fft(Y) / (n*sqrt(n)); # FFT computing and normalization
+      b = a/sqrt(psdwhitening)             # whitening
+      c = fft(b, inverse = TRUE);           # FFT inverse
+      YY = Re(c)*sqrt(n);
+      myfilter=butter(n=4,W=10/(fs/2),type="high")
+      YY=filtfilt(filt=myfilter,x=YY)          
+    }
+  else {
+    print("No filtering method specify")
+    YY=Y
+  }
 
-  if (filtering == "whitening"){
-    # whiten the data
-    ar_model <- stats::ar(Y1,order.max=2, aic=FALSE ,method=c("yule-walker"), demean=TRUE);
-    b <- stats::filter(x=Y, filt=c(1, -ar_model$ar[1], -ar_model$ar[2]), method="convolution",  sides = 1);
-    YY=b
+  # select the orginal data size
+  Tf = seq(1, n_0, by = 1)
+
+  for (i in 1:n_0){
+    Tf[i]=wvf.df$V1[1]+i/fs
   }
   
-  # select the orginal data size
-  Tf = wvf.df$V1
   Yf = seq(1, n_0, by = 1)
   YYf = seq(1, n_0, by = 1)
-  
+
   for (i in 1:n_0){
     Yf[i]=Y[ind1+i]
     YYf[i]=YY[ind1+i]
   }
-    
-  if (actPlot==TRUE){  
-    ts.plot(Y); # noise only
-    points(T, Y, col="black", type="l", pch=1, panel.first = grid())
-    points(T,YY,col="red",type="l",pch=2); # (noise + signal) filtered
-    T_wvf=seq(ind1,ind1+wvf_size-1,by=1)
-    points(T_wvf,(wvf.df$V2)*ampl,col="green",type="l",pch=3);  # signal only
-#    points(T,Y1,col="cyan",type="l")
-#    points(Tf,YYf,col="green",type="l",pch=3);  # signal only
-    leg = c("noise", "(noise+signal) HP filtered", "signal only")
-    col = c("black","red","green")
-    legend(x=0,y=-5*10^-21,legend=leg,cex=.8,col=col,pch=c(1,3))
+
+  if (actPlot==TRUE){
+    if (filtering == "HP"){
+      ts.plot(Y); # noise only
+      points(T, Y, col="black", type="l", pch=1, panel.first = grid())
+      points(T, YY, col="red", type="l", pch=2);                                # (noise + signal) filtered
+      T_wvf=seq(ind1,ind1+wvf_size-1,by=1)
+      points(T_wvf,(wvf.df$V2)*ampl,col="green",type="l",pch=3);  # signal only
+
+      leg = c("noise", "(noise+signal) HP filtered", "signal only")
+      col = c("black","red","green")
+      legend (x=0,y=max(Y)*.9,legend=leg,cex=.8,col=col,pch=c(1,3))
+    }
+
+    # Fourier transform
+    YYFT = sqrt(fs) * fft(YY) / (n*sqrt(n)); # FFT computing and normalization
+    plot (freq1, abs(YYFT)[1:int(n/2)], log="xy", type="l", xlab="frequency",ylab="ASD", col="grey",xlim=c(1, 4*10^3),panel.first = grid())
+    legend (x=10, y=min(abs(YYFT))*1.2, legend="signal+noise FT")
+ 
+    # Output vectors time series
+
+    if (filtering == "HP"){
+      plot (Tf, Yf, type="l", col="black")
+      points (Tf, YYf, type="l", col="red")
+      legend (x=Tf[1], y=max(Yf)*.9, col=c("black","red"), legend=c("noise+signal", "noise+signal after HP filter"))
+    }else{
+      plot (Tf, Yf, type="l", col="black")
+      legend (x=Tf[1], y=max(Yf)*.9, legend="noise+signal")
+    }
   }
 
   return(list(t=Tf,x=Yf,y=YYf))
