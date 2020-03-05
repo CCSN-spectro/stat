@@ -61,7 +61,7 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
   }
   
   ps = NULL;
-  
+  #print(c(dim(z),mp))
   for(i in (dim(z)[1]-1):1){
     
     #print(i);
@@ -113,14 +113,19 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
   ps = NULL;
   
   for(i in 2:dim(z)[1]){
-    
-    #print(i);
-    ps  = c(ps, mp);
-    ind = (mp-dm_L):(mp+um_L);
-    ind = ind[ind>0]; # preventing values below 0
-    ind = ind[ind<dim(z)[2]]; # preventing from large values
-    mp  = ind[which.max(z[i, ind])];
-  }
+    #if (length((mp-dm_L):(mp+um_L)) > 0){
+      #print(i);
+      ps  = c(ps, mp);
+      ind = (mp-dm_L):(mp+um_L);
+      ind = ind[ind>0]; # preventing values below 0
+      ind = ind[ind<=dim(z)[2]]; # preventing from large values
+      mp  = ind[which.max(z[i, ind])];
+    #}
+    #else{
+    #  print(c("dm_L+um_L is null",mp,dm_L, um_L))
+    #  break
+    #}
+  } 
   
   ps_L     = c(ps, mp); # adding last mp value
   maxf_L = y[ps_L]; # FREQUENCIES FOR LARGEST POWER
@@ -372,7 +377,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   true_ratios = thruth_data$x
   
   # spectrogram
-  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=FALSE, logPow=TRUE,
+  r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=actPlot, logPow=TRUE,
                 zoomFreq=c(0,1)); # generating the spectrogram
   
   n = length(data$V1); # number of observations
@@ -460,12 +465,13 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
       if(sfq <= 2){ 
         if(sfq == 0){
           warning(paste("All frequencies are greater than limFreq", j));
+          print("All frequencies are greater than limFreq")
         }else{
           warning(paste("Only", sfq, "frequency is lower than limFreq", j));
         }
         out1 = rbind(out1, c(NA, NA));
-        out2 = rbind(out2, rep(NA, 7));
-        out3 = rbind(out3, c(NA, NA));
+        out2 = rbind(out2, c(NA, NA));
+        out3 = rbind(out3, c(NA));
       }
       else { # At least 3 g-modes (in maxf) are required to generate the cvvpbb band
         maxf1     = maxf[discFreq];     # discarding frequencies according to limFreq
@@ -584,33 +590,32 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         
         # Residuals
         res  = true_ratio1 - fm(true_time1); # true_value - estimate
-        out2 = rbind(out2, c(summary(res), sd(res)));
+        res_mean = mean(abs(res))
+        res_var = mean(abs(res)/true_ratio1)
+        out2 = rbind(out2, c(res_mean, res_var));
         
         # chi2
-        chi2<-sum((true_ratio1 - fm(true_time1))^2/true_ratio1)
-        chi2_bis<-sum((true_ratio1 - fm(true_time1))^2/(fu(true_time1) - fd(true_time1)))
-        out3 = rbind(out3, c(chi2, chi2_bis));
+        chi2<-sum((true_ratio1 - fm(true_time1))^2/(fu(true_time1) - fd(true_time1)))
+        out3 = rbind(out3, chi2);
         
-        if(actPlot == TRUE){
-          
-          plot(true_time1, res, xlab = "Time",
-               ylab = "Residual", ylim = c(-8e-4, 8e-4), xlim=c(0,max(true_time1)*1.1), type = "n",
-               main = paste("Frequency cutoff", j,"-",gm, "gmode"));
-          points(true_time1, res, col = "black", pch=1);
-        }
+#        if(actPlot == TRUE){
+#          plot(true_time1, res, xlab = "Time",
+#               ylab = "Residual", ylim = c(-8e-4, 8e-4), xlim=c(0,max(true_time1)*1.1), type = "n",
+#               main = paste("Frequency cutoff", j,"-",gm, "gmode"));
+#          points(true_time1, res, col = "black", pch=1);
+#        }
       } # end 'all(discFreq)'
       
     } # end loop
     
-   
     # colnames      
     out1 = cbind(limFreq, out1);
     out2 = cbind(limFreq, out2);
     out3 = cbind(limFreq, out3);
     colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
-    colnames(out2)[length(colnames(out2))] = "sd";
-    colnames(out3) = c("limFreq", "chi2 goodfit", "chi2")
-    
+    colnames(out2) = c("limFreq", "res_mean", "res_variance");
+    colnames(out3) = c("limFreq", "chi2")
+
     R[[gm]] = list(covpbb = out1, residual = out2, chi2 = out3);
     
   }
