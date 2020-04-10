@@ -1,11 +1,12 @@
 library ("stats")
 library ("signal")
 library ("seewave")
-library("psd")
+library ("psd")
+library ("pracma")
 
 
 ########################################################################
-data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering, fcut, actPlot=TRUE){
+data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlot=TRUE){
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
@@ -32,9 +33,9 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering, fcut, a
   n=duration*fs 
   n_0=n
   wvf_opt=0
-
+  print(length(wvf.df))
   # Prepration in case a signal is added  
-  if (length(wvf.df)!=1) {
+  if (length(wvf.df)!=0) {
     wvf_opt=1
     wvf_size=length(wvf.df$V2)
     if (wvf_size>n){
@@ -63,16 +64,16 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering, fcut, a
   T = seq(1, n, by = 1)  
 
   X = rnorm(n, mean=0, sd=1);           # Gaussian white noise
-  XX = sqrt(fs) * fft(X) / (n*sqrt(n)); # FFT computing and normalization
+  XX = fft(X); # FFT computing and normalization
   XXX = XX*sqrt(psd);                   # Coloring
   Y = fft(XXX, inverse = TRUE);         # FFT inverse
-  Y = Re(Y)*sqrt(n);                    # noise in time domain
+  Y = Re(Y)/sqrt(fs);                    # noise in time domain
 
   X1 = rnorm(n, mean=0, sd=1);            # Gaussian white noise
-  XX1 = sqrt(fs) * fft(X1) / (n*sqrt(n)); # FFT computing and normalization
+  XX1 = fft(X1); # FFT computing and normalization
   XXX1 = XX1*sqrt(psd);                   # Coloring
   Y1 = fft(XXX1, inverse = TRUE);         # FFT inverse
-  Y1 = Re(Y1)*sqrt(n);                    # noise in time domain
+  Y1 = Re(Y1)/sqrt(fs);                    # noise in time domain
   
   # Signal addition (centered at the middle of the data vector to avoid filtering leakage
   # at the beggining and end).
@@ -164,6 +165,160 @@ data_generator = function (fs, duration, wvf.df=NULL, ampl=1, filtering, fcut, a
 
   return(list(t=Tf,x=Yf,y=YYf))
   }
+
+########################################################################
+noise_generator = function (fs, duration, filtering, actPlot=TRUE, verbose=FALSE){
+########################################################################
+  # fs: sampling frequency
+  # duration: duration (in second) of the output time serie
+  # filtering method:
+  #   "HP" : The fcut parameter is fixed internally (15 Hz)
+  #   "spectrum" : the data are whiten in Fourier domain using the noise spectrum estimate
+  #   "AR" : AR model
+  #   "prewhiten": use the R prewhiten function
+ 
+  # output: d$t: time vector
+  #         d$x: noise
+  
+  # check that duration is an integer > 0
+  
+  if ((duration%%1)>0){
+    print("duration must be a positive integer")
+    return()
+  }
+  
+  n=duration*fs 
+  if (verbose==TRUE){print(c("Size of the vectors: ", n))}
+  
+  # Noise generation
+  freq2 = fs*fftfreq(n)          # two-sided frequency vector
+  freq2[1]=0.001                 # to avoid plotting pb in logscale
+  freq1=freq2[1:int(n/2)]        # one-sided frequency vector
+  psd=aLIGO_PSD_new(freq2,2)     # two-sided PSD          
+
+  # compute noise sigma
+  s0 <- sqrt(2*trapz(freq1,psd[1:int(n/2)]))
+  if (verbose==TRUE){print(c("aLIGO ASD noise rms:", s0))}
+    
+  T = seq(1, n, by = 1)  
+  
+  X = rnorm(n, mean=0, sd=1);           # Gaussian white noise
+  XX = fft(X);                          # FFT computing
+  XXX = XX*sqrt(psd);                   # Coloring
+  Y = fft(XXX, inverse = TRUE);         # FFT inverse
+  Y = Re(Y)/sqrt(fs);                   # noise in time domain
+ 
+  if (filtering == "HP"){
+    fcut=15
+    # filtfilt : zero phase filter (forward& backward)
+    myfilter=butter(n=4,W=fcut/(fs/2),type="high")
+    YY=filtfilt(filt=myfilter,x=Y)          
+  }
+  else 
+    if (filtering == "AR"){
+      # generate another noise TS
+      X1 = rnorm(n, mean=0, sd=1);            # Gaussian white noise
+      XX1 = fft(X1);                          # FFT computing
+      XXX1 = XX1*sqrt(psd);                   # Coloring
+      Y1 = fft(XXX1, inverse = TRUE);         # FFT inverse
+      Y1 = Re(Y1)/sqrt(fs);                   # noise in time domain
+
+      ar_model <- stats::ar(Y1,order.max=10, aic=FALSE ,method=c("yule-walker"), demean=TRUE);
+      b <- stats::filter(x=Y, filt=c(1, -ar_model$ar[1], -ar_model$ar[2], -ar_model$ar[3], -ar_model$ar[4], -ar_model$ar[5], -ar_model$ar[6], -ar_model$ar[7], -ar_model$ar[8], -ar_model$ar[9], -ar_model$ar[10]), method="convolution",  sides = 1);
+      b[1]=b[2]=b[3]=b[4]=b[5]=b[6]=b[7]=b[8]=b[9]=b[10]=b[11]
+      YY=b
+    }
+    else 
+      if (filtering == "spectrum"){
+        # generate another noise TS
+        X1 = rnorm(n, mean=0, sd=1);           # Gaussian white noise
+        XX1 = fft(X1);                          # FFT computing
+        XXX1 = XX1*sqrt(psd);                   # Coloring
+        Y1 = fft(XXX1, inverse = TRUE);         # FFT inverse
+        Y1 = Re(Y1)/sqrt(fs);                   # noise in time domain
+
+        # compute the PSD
+        psdest <- pspectrum(Y1,Y1.frqsamp=fs, ntap.init=6, Nyquist.normalize = TRUE, plot=FALSE,verbose = FALSE)
+        psdwhitening=rep(0, n);
+        for(i in 1:(int(n/2))){
+          psdwhitening[i]=psdest$spec[i]
+          psdwhitening[n+1-i]=psdest$spec[i]
+        }
+
+        psdwhitening=psdwhitening*fs
+    
+        a = fft(Y)                        # FFT computing and normalization
+        b = a/sqrt(psdwhitening)          # whitening
+        c = fft(b, inverse = TRUE);       # FFT inverse
+        YY = s0*Re(c)/sqrt(fs/2);
+
+        #    myfilter=butter(n=4,W=10/(fs/2),type="high")
+        #    YY=filtfilt(filt=myfilter,x=YY)          
+      }
+      else 
+        if (filtering == "prewhiten"){
+          # prewhiten
+          myts <- ts(Y)
+          myts <- prewhiten(myts, AR.max=100, zero.pad="rear", plot=FALSE, verbose=FALSE)
+          YY <- myts[['prew_ar']]
+        }
+        else {
+          print("No filtering method specify")
+          YY=Y
+        }
+  
+  # select the orginal data size
+  Tf = seq(1, n, by = 1)
+  
+  for (i in 1:n){
+    Tf[i]=i/fs
+  }
+  
+
+  if (actPlot==TRUE){
+    #ts.plot(Y); # noise only
+    #points(T, Y, col="black", type="l", pch=1, panel.first = grid())
+      
+    leg = c("noise")
+    col = c("black")
+    legend (x=0,y=max(Y)*.9,legend=leg,cex=.8,col=col,pch=c(1))
+    
+    # spectrum estimated
+    psdest <- pspectrum(Y, Y.frqsamp=fs, ntap.init=NULL, Nyquist.normalize = TRUE, plot=FALSE,verbose = FALSE)
+    psdest_filtered <- pspectrum(YY, YY.frqsamp=fs, ntap.init=NULL, Nyquist.normalize = TRUE, plot=FALSE,verbose = FALSE)
+ 
+    # Fourier transform
+    YFT = sqrt(fs) * fft(Y) / (n*sqrt(n));
+    WFT = sqrt(fs) * fft(YY) / (n*sqrt(n));
+    plot (freq1, abs(YFT)[1:int(n/2)], log="xy", type="l", xlab="frequency", ylab="ASD", col="grey", xlim=c(1, fs/2), pch=1, panel.first = grid())
+    lines(freq1, sqrt(psd[1:int(n/2)]), col="red", pch=3)
+    lines(fs*psdest$freq, sqrt(psdest$spec)*sqrt(fs/2)/n, col="blue", pch=2)
+   
+    lines(freq1, abs(WFT)[1:int(n/2)], col="black", pch=4)
+    lines(fs*psdest_filtered$freq[1:int(n/2)], sqrt(psdest_filtered$spec[1:int(n/2)])*sqrt(fs/2)/n, col="green", pch=5)
+    
+    legend_str=c("col noise FT", "col noise spectrun", "ASD model", "filtered FT", "filtered spectrum")
+    legend (x=1, y=min(abs(YFT))*50, legend=legend_str, col=c("grey","blue","red","black","green"), pch=c(1,2,3,4,5))   
+
+    s1 <- sqrt(2*trapz(fs*psdest$freq[1:int(n/2)], psdest$spec[1:int(n/2)]*fs/2/n/n))
+    if (verbose==TRUE){print(c("colored noise rms:", s1))}
+  
+    s2 <- sqrt(2*trapz(fs*psdest_filtered$freq[1:int(n/2)], psdest_filtered$spec[1:int(n/2)]*fs/2/n/n))
+    if (verbose==TRUE){print(c("filtered noise rms:", s2))}
+
+    
+    # Output vectors time series
+    
+#    if (filtering == "HP"){
+#      plot (Tf, Yf, type="l", col="black")
+#      points (Tf, YYf, type="l", col="red")
+#      legend (x=Tf[1], y=max(Yf)*.9, col=c("black","red"), legend=c("noise+signal", "noise+signal after HP filter"))
+#    }
+  }
+  
+  return(list(t=Tf,x=Y))
+}
+
 
 ########################################################################
 fftfreq = function(n, d = 1){
