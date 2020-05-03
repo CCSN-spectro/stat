@@ -23,6 +23,10 @@ signalx=seq(1,fs*duration,by=1)
 for (i in 1:fs*duration) {
   signalx[i]=mean(s20$V1[((i-1)*4+1):((i-1)*4+4)])
 }
+# remove times corresponding to the bounce for this wvf
+ind = which(signalx>0.28);
+signalx=signalx[ind]
+signaly=signaly[ind]
 
 wvf.df = data.frame("V1"=signalx,"V2"=signaly)
 
@@ -39,6 +43,9 @@ timeGmode = s20_0[c(1,length(s20_0[,1])), 1];#time interval for signal different
 # For g2 modes, ratio (x variable in TF19) is x = Mpns / Rpns^2 
 true_data = read.table("../simulation_data/s20_data_g2.dat", sep = ",", comment.char = "#",header = TRUE); # true values
 colnames(true_data) = c ("time","x");
+
+# remove times corresponding to the bounce for this wvf
+true_data=subset(true_data, time >= 0.28)
 
 ############################
 ### FREQUENTIST ANALYSIS ###
@@ -69,7 +76,7 @@ s2 = "~ f + I(f^2) - 1";
 Xm  = model.matrix(eval(parse(text=eval(parse(text=mu2)))), fits_data);
 Xs  = model.matrix(eval(parse(text=eval(parse(text=s2)))), fits_data);
 
-fit = lmvar(fits_data$r, X_mu = Xm, X_sigma = Xs, intercept_mu = FALSE);
+fit = lmvar(fits_data$r, X_mu = Xm, X_sigma = Xs, intercept_mu = TRUE);
 
 # g-mode estimate: starting from the right, left or median
 #gmode = c("left", "right", "median");
@@ -82,28 +89,30 @@ gmode = c("left");
 
 # loop over N generation of noisy data and add signal
 
+actplot=TRUE
 N=100
-dist_nb=24
+dist_nb=20
 result<-matrix(nrow=N*dist_nb,ncol=12)
 
 for (j in 1:dist_nb){
   dist = 1+(j-1)*.25
-  print(c("distance:",dist))
+  print(c("distance:",dist,"kpc"))
   for (i in 1:N){
-    d = data_generator(fs, duration, wvf.df, ampl=10/dist, filtering = "whitening_bis", fcut, actPlot=FALSE);
+    #d = data_generator(fs, duration, wvf.df, ampl=10/dist, filtering = "whitening_bis", fcut, actPlot=FALSE);
+    d = data_generator1(fs, duration, wvf.df, ampl=10/dist, filtering = "prewhiten", actPlot=FALSE);
     noisydata = data.frame("V1"=d$t,"V2"=d$y);
     out = covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,
-              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 500),
-              um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(500, 1700),
+              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 300),
+              um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
               gmode = gmode,
               thruth_data=true_data, actPlot=FALSE,
               limFreq = c(1000));
 
     out1 = covpbb(noisydata, mod=fit, l=200, p=90, fs=fs,
-               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, Inf),
-               um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(500, 1700),
+               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 300),
+               um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
                gmode = gmode,
-               thruth_data=true_data, actPlot=FALSE,
+               thruth_data=true_data, actPlot=actplot,
                limFreq = c(1000));
     
     result[i+(j-1)*N,1]=out$covpbb[1,1]
@@ -123,7 +132,10 @@ for (j in 1:dist_nb){
   
   }
 }
-write.table(result, file="results_fcut1000Hz_AA.txt", sep=" ", row.names=FALSE, col.names=FALSE)
+print(out)
+print(out1)
+
+write.table(result, file="results_prewhiten_fcut1000Hz_AA.txt", sep=" ", row.names=FALSE, col.names=FALSE)
 
 #########################
 ### BAYESIAN ANALYSIS ###
