@@ -469,9 +469,16 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         }else{
           warning(paste("Only", sfq, "frequency is lower than limFreq", j));
         }
-        out1 = rbind(out1, c(NA, NA));
-        out2 = rbind(out2, c(NA, NA));
-        out3 = rbind(out3, c(NA));
+        if(any(class(mod) == "lm")){
+          out1 = rbind(out1, c(-1, -1));
+          out2 = rbind(out2, c(-1, -1));
+          out3 = rbind(out3, c(-1));
+        }
+        else {
+          out1 = rbind(out1, c(-2, -2));
+          out2 = rbind(out2, c(-2, -2));
+          out3 = rbind(out3, c(-2));
+        }                
       }
       else { # At least 3 g-modes (in maxf) are required to generate the cvvpbb band
         maxf1     = maxf[discFreq];     # discarding frequencies according to limFreq
@@ -595,7 +602,9 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         out2 = rbind(out2, c(res_mean, res_var));
         
         # chi2
-        chi2<-sum((true_ratio1 - fm(true_time1))^2/(fu(true_time1) - fd(true_time1)))
+        chi2<- 4*sum((true_ratio1 - fm(true_time1))^2/(fu(true_time1) - fd(true_time1))^2)
+        chi2=chi2/length(true_ratio1)
+
         out3 = rbind(out3, chi2);
         
 #        if(actPlot == TRUE){
