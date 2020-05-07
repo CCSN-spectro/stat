@@ -167,7 +167,7 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
   }
 
 ########################################################################
-data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, actPlot=TRUE, verbose=FALSE){
+data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, actPlot=TRUE, verbose=FALSE){
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
@@ -179,7 +179,8 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, actPlot=TRU
   #   "spectrum" : the data are whiten in Fourier domain using the noise spectrum estimate
   #   "AR" : AR model
   #   "prewhiten": use the R prewhiten function
-  #
+  # 
+  # setseed: if null, random seed. Otherwise set to the value
   # The wvf is centered in the noise vector
   # 
   # output: d$t: time vector
@@ -234,6 +235,8 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, actPlot=TRU
   
   T = seq(1, n, by = 1)  
 
+  if (setseed>0){set.seed(setseed)}
+  
   X = rnorm(n, mean=0, sd=1);           # Gaussian white noise
   XX = fft(X);                          # FFT computing and normalization
   XXX = XX*sqrt(psd);                   # Coloring
@@ -292,7 +295,7 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, actPlot=TRU
         a = fft(Y)                        # FFT computing and normalization
         b = a/sqrt(psdwhitening)          # whitening
         c = fft(b, inverse = TRUE);       # FFT inverse
-        YY = s0*Re(c)/n/sqrt(fs);         # Normalisation factor of the 2 FFTs
+        YY = s0*Re(c)/n/sqrt(fs)/10;         # Normalisation factor of the 2 FFTs
 
       }
       else 
@@ -362,7 +365,7 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, actPlot=TRU
   
   
 ########################################################################
-noise_generator = function (fs, duration, filtering, actPlot=TRUE, verbose=FALSE){
+noise_generator = function (fs, duration, filtering, setseed=0, actPlot=TRUE, verbose=FALSE){
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
@@ -371,7 +374,8 @@ noise_generator = function (fs, duration, filtering, actPlot=TRUE, verbose=FALSE
   #   "spectrum" : the data are whiten in Fourier domain using the noise spectrum estimate
   #   "AR" : AR model
   #   "prewhiten": use the R prewhiten function
- 
+  # setseed: if null, random seed. Otherwise set to the value
+  #
   # output: d$t: time vector
   #         d$x: noise
   
@@ -395,14 +399,16 @@ noise_generator = function (fs, duration, filtering, actPlot=TRUE, verbose=FALSE
   s0 <- sqrt(2*trapz(freq1,psd[1:int(n/2)]))
   if (verbose==TRUE){print(c("aLIGO ASD noise rms:", s0))}
     
-  T = seq(1, n, by = 1)  
+  T = seq(1, n, by = 1)
   
+  if (setseed>0){set.seed(setseed)}
+
   X = rnorm(n, mean=0, sd=1);           # Gaussian white noise
   XX = fft(X);                          # FFT computing
   XXX = XX*sqrt(psd);                   # Coloring
   Y = fft(XXX, inverse = TRUE);         # FFT inverse
   Y = Re(Y)/sqrt(fs);                   # noise in time domain
- 
+  
   if (filtering == "HP"){
     fcut=15
     # filtfilt : zero phase filter (forward& backward)
