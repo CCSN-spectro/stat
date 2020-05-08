@@ -497,16 +497,16 @@ noise_generator = function (fs, duration, filtering, setseed=0, actPlot=TRUE, ve
     # Fourier transform
     YFT = sqrt(fs) * fft(Y) / (n*sqrt(n));
     WFT = sqrt(fs) * fft(YY) / (n*sqrt(n));
-    plot (freq1, abs(YFT)[1:int(n/2)], log="xy", type="l", xlab="frequency", ylab="ASD", col="grey", xlim=c(1, fs/2), pch=1, panel.first = grid())
+    plot (freq1, abs(YFT)[1:int(n/2)], log="xy", type="l", xlab="frequency", ylab="ASD", col="grey", xlim=c(1, fs/2), ylim=c(1e-26,1e-20), pch=1, panel.first = grid())
 
     lines(freq1, sqrt(psd[1:int(n/2)]), col="red", pch=3)
     lines(fs*psdest$freq, sqrt(psdest$spec)*sqrt(fs/2)/n, col="blue", pch=2)
    
     lines(freq1, abs(WFT)[1:int(n/2)], col="black", pch=4)
     lines(fs*psdest_filtered$freq[1:int(n/2)], sqrt(psdest_filtered$spec[1:int(n/2)])*sqrt(fs/2)/n, col="green", pch=5)
-    
+
     legend_str=c("col noise FT", "col noise spectrun", "ASD model", "filtered FT", "filtered spectrum")
-    legend (x=1, y=min(abs(YFT))*50, legend=legend_str, col=c("grey","blue","red","black","green"), pch=c(1,2,3,4,5))   
+    legend (x=100, y=min(abs(tail(YFT,-1)))*50000, legend=legend_str, col=c("grey","blue","red","black","green"), pch=c(1,2,3,4,5))   
 
     s1 <- sqrt(2*trapz(fs*psdest$freq[1:int(n/2)], psdest$spec[1:int(n/2)]*fs/(2*n*n)))
     if (verbose==TRUE){print(c("colored noise rms:", s1))}
@@ -636,9 +636,12 @@ aLIGO_PSD_new = function(f,type){
         output[fn-i]=output[i]
       }
     }  
-    output=output/2;          # Two sided PSD
+    output=output/2;            # Two sided PSD
+    output=shifter(output,-1)   # Wraparound frequency: f=0 must be the last element
   }
   return(output);
 }
 
-    
+shifter = function(x, n = 1) {
+  if (n == 0) x else c(tail(x, -n), head(x, n))
+}    
