@@ -29,6 +29,11 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
   
   x = r$x; y = r$y; z = r$z; # values from spectrogram
   
+#  for(i in 1:dim(z)[1]){
+#    i1=which.max(z[i,]); # position maximum value
+#    print(c(i1,y[i1],z[i,i1]))
+#    }
+  
   ##################
   ### Right side ###
   ##################
@@ -47,7 +52,6 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
     
     mp    = apply(initz, 1, which.max); # maximum in last m columns of spectrogram
     mp    = round(median(mp)); # position maximum value
-    
   }else if(m_R == 1){
     
     initz = z[dim(z)[1],]; # last column of spectrogram
@@ -59,9 +63,7 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
     mp = which.max(z[dim(z)[1],]); # position maximum value
     
   }
-  
   ps = NULL;
-  #print(c(dim(z),mp))
   for(i in (dim(z)[1]-1):1){
     
     #print(i);
@@ -83,20 +85,19 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
   #################
   ### Left side ###
   #################
-  
+
+ 
   # limiting frequencies according to initfreq in y
   inity = (y >= initfreq_L[1]) & (y <= initfreq_L[2]); # logical vector
   
-  zn    = dim(z)[1]; # row number (columns in spectrogram) 
-  initz = z[1:m_L, ]; # m last columns of the spectrogram
-  
+  initz = z[1:m_L, ]; # m first columns of the spectrogram
+
   if(m_L != 1){
     
     if(initfreq_L[1] != -Inf || initfreq_L[2] != Inf){
       initz[, !inity] = -Inf; # discarding certain freq according to initfreq
     }
-    
-    mp    = apply(initz, 1, which.max); # maximum in last m columns of spectrogram
+    mp    = apply(initz, 1, which.max); # maximum in first m columns of spectrogram
     mp    = round(median(mp)); # position maximum value
     
   }else if(m_L == 1){
@@ -110,6 +111,7 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
     mp = which.max(z[1,]); # position maximum value
     
   }
+  
   ps = NULL;
   
   for(i in 2:dim(z)[1]){
@@ -120,6 +122,7 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
       ind = ind[ind>0]; # preventing values below 0
       ind = ind[ind<=dim(z)[2]]; # preventing from large values
       mp  = ind[which.max(z[i, ind])];
+      #print(c(z[i,ind],mp,y[mp]))
     #}
     #else{
     #  print(c("dm_L+um_L is null",mp,dm_L, um_L))
@@ -203,7 +206,6 @@ findGmodes = function(r, um_R=0, dm_R = 8, um_L = 8, dm_L = 0, m_R = 8, m_L = 8,
     maxf = y[ps]; 
     
   }
-  
   return(list(maxf_med = maxf, maxf_L = maxf_L, maxf_R = maxf_R));
   
 }
@@ -418,8 +420,14 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   maxfs = sapply(maxfs,function(x)movf(x, n=movGmode, median));# smoothing g-mode estimates
   maxfs = as.data.frame(maxfs);
+
   if(actPlot == TRUE){
-    points(timefreq, maxfs$maxf_med, col='black')
+    if(gmode == "left"){
+      points(timefreq, maxfs$maxf_L, col='black')
+    }else if (gmode == "right"){
+      points(timefreq, maxfs$maxf_R, col='black')
+      }else{
+        points(timefreq, maxfs$maxf_med, col='black')}
     #arrows(timefreq, maxfs$maxf_L, timefreq, maxfs$maxf_R, code=3, angle=90,
     #       length=0.05, col="gray");
   }
@@ -595,18 +603,14 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         p = mean(prop);
         out1 = rbind(out1, c(p, median(l))); # covpbb & medBandWidth
         
-        # Residuals
+        # Residual, RMS & precision
         res  = true_ratio1 - fm(true_time1); # true_value - estimate
-        res_mean = mean(abs(res))
-        res_var = mean(abs(res)/true_ratio1)
-        out2 = rbind(out2, c(res_mean, res_var));
+        res_absres = mean(abs(res))
+        res_MSE = mean(res^2)
+        res_precision = mean(abs(res)/true_ratio1)
         
-        # chi2
-        chi2<- 4*sum((true_ratio1 - fm(true_time1))^2/(fu(true_time1) - fd(true_time1))^2)
-        chi2=chi2/length(true_ratio1)
-
-        out3 = rbind(out3, chi2);
-        
+        out2 = rbind(out2, c(res_absres, res_MSE, res_precision));
+                
 #        if(actPlot == TRUE){
 #          plot(true_time1, res, xlab = "Time",
 #               ylab = "Residual", ylim = c(-8e-4, 8e-4), xlim=c(0,max(true_time1)*1.1), type = "n",
@@ -620,12 +624,13 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     # colnames      
     out1 = cbind(limFreq, out1);
     out2 = cbind(limFreq, out2);
-    out3 = cbind(limFreq, out3);
     colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
-    colnames(out2) = c("limFreq", "res_mean", "res_variance");
-    colnames(out3) = c("limFreq", "chi2")
+    colnames(out2) = c("limFreq", "absres", "MSE", "precision");
 
-    R[[gm]] = list(covpbb = out1, residual = out2, chi2 = out3);
+    
+
+    
+    R[[gm]] = list(covpbb = out1, residual = out2);
     
   }
   
