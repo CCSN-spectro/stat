@@ -9,7 +9,7 @@ library(signal)
 fs=4096
 duration=1
 ampl=10
-fcut=15
+filtering_method="prewhiten"
 
 ######################
 ### prepare signal ###
@@ -17,18 +17,23 @@ fcut=15
 s20 = read.table("../simulation_data/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
 
 # signal sampled at 16384 Hz. Resampling at fs
+resamp_factor=16384/fs
 signaly=resample(s20$V2,1/16384,1/fs)
+
 # decimate time vector
-signalx=seq(1,fs*duration,by=1)
-for (i in 1:fs*duration) {
-  signalx[i]=mean(s20$V1[((i-1)*4+1):((i-1)*4+4)])
+signalx=seq(1,(fs*duration),by=1)
+for (i in 1:(fs*duration)) {
+  signalx[i]=mean(s20$V1[((i-1)*resamp_factor+1):((i-1)*resamp_factor+resamp_factor)])
 }
+
 # remove times corresponding to the bounce for this wvf
 ind = which(signalx>0.28);
 signalx=signalx[ind]
 signaly=signaly[ind]
 
 wvf.df = data.frame("V1"=signalx,"V2"=signaly)
+
+#############################################################
 
 # determine the time interval where signal is non null
 s20_0 = s20[,2]!=0;  # identifying values == 0
@@ -90,15 +95,14 @@ gmode = c("left");
 # loop over N generation of noisy data and add signal
 
 actplot=TRUE
-dist=3.
+dist=3
 
-#d = data_generator(fs, duration, wvf.df, ampl=10/dist, filtering = "whitening_bis", fcut, actPlot=FALSE);
-d = data_generator1(fs, duration, wvf.df, ampl=10/dist, filtering = "prewhiten", setseed=1, actPlot=FALSE);
+d = data_generator1(fs, duration, wvf.df, ampl=10/dist, filtering = "spectrum", setseed=0, actPlot=FALSE);
 noisydata = data.frame("V1"=d$t,"V2"=d$y);
 
 # Linear model
 out = covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,
-              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 500),
+              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(200, 500),
               um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
               gmode = gmode,
               thruth_data=true_data, actPlot=TRUE,
@@ -106,7 +110,7 @@ out = covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,
 
 # lmvar
 out1 = covpbb(noisydata, mod=fit, l=200, p=90, fs=fs,
-               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 500),
+               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(200, 500),
                um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
                gmode = gmode,
                thruth_data=true_data, actPlot=TRUE,
