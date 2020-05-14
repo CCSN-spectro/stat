@@ -9,7 +9,7 @@ library(signal)
 fs=4096
 duration=1
 ampl=10
-fcut=15
+filtering_method="prewhiten"
 
 ######################
 ### prepare signal ###
@@ -17,18 +17,24 @@ fcut=15
 s20 = read.table("../simulation_data/s20-gw_10kpc16384.dat"); # V1 time, V2 signal
 
 # signal sampled at 16384 Hz. Resampling at fs
+resamp_factor=16384/fs
 signaly=resample(s20$V2,1/16384,1/fs)
+
 # decimate time vector
-signalx=seq(1,fs*duration,by=1)
-for (i in 1:fs*duration) {
-  signalx[i]=mean(s20$V1[((i-1)*4+1):((i-1)*4+4)])
+signalx=seq(1,(fs*duration),by=1)
+for (i in 1:(fs*duration)) {
+  signalx[i]=mean(s20$V1[((i-1)*resamp_factor+1):((i-1)*resamp_factor+resamp_factor)])
 }
+
 # remove times corresponding to the bounce for this wvf
 ind = which(signalx>0.28);
 signalx=signalx[ind]
 signaly=signaly[ind]
 
 wvf.df = data.frame("V1"=signalx,"V2"=signaly)
+
+
+####################################################################
 
 # determine the time interval where signal is non null
 s20_0 = s20[,2]!=0;  # identifying values == 0
@@ -98,21 +104,20 @@ for (j in 1:dist_nb){
   dist = 1+(j-1)*.25
   print(c("distance:",dist,"kpc"))
   for (i in 1:N){
-    #d = data_generator(fs, duration, wvf.df, ampl=10/dist, filtering = "whitening_bis", fcut, actPlot=FALSE);
-    d = data_generator1(fs, duration, wvf.df, ampl=10/dist, filtering = "prewhiten", actPlot=FALSE);
+    d = data_generator1(fs, duration, wvf.df, ampl=10/dist, filtering = filtering_method, actPlot=FALSE);
     noisydata = data.frame("V1"=d$t,"V2"=d$y);
     out = covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,
-              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 300),
+              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(100, 500),
               um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
               gmode = gmode,
               thruth_data=true_data, actPlot=FALSE,
               limFreq = c(1000));
 
     out1 = covpbb(noisydata, mod=fit, l=200, p=90, fs=fs,
-               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 300),
+               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(100, 500),
                um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
                gmode = gmode,
-               thruth_data=true_data, actPlot=actplot,
+               thruth_data=true_data, actPlot=TRUE,
                limFreq = c(1000));
     
     result[i+(j-1)*N,1]=out$covpbb[1,1]
@@ -122,20 +127,19 @@ for (j in 1:dist_nb){
     result[i+(j-1)*N,4]=out$covpbb[1,3]
     result[i+(j-1)*N,5]=out$residual[1,2]
     result[i+(j-1)*N,6]=out$residual[1,3]
-    result[i+(j-1)*N,7]=out$chi2[1,2]
-  
+    result[i+(j-1)*N,7]=out$residual[1,4]
+
     result[i+(j-1)*N,8]=out1$covpbb[1,2]
     result[i+(j-1)*N,9]=out1$covpbb[1,3]
     result[i+(j-1)*N,10]=out1$residual[1,2]
     result[i+(j-1)*N,11]=out1$residual[1,3]
-    result[i+(j-1)*N,12]=out1$chi2[1,2]
-  
+    result[i+(j-1)*N,12]=out1$residual[1,4]
+   
   }
 }
-print(out)
-print(out1)
 
-write.table(result, file="results_prewhiten_fcut1000Hz_AA.txt", sep=" ", row.names=FALSE, col.names=FALSE)
+filename=sprintf("results_%s_fcut1000Hz_AA.txt", filtering_method)
+write.table(result, file=filename, sep=" ", row.names=FALSE, col.names=FALSE)
 
 #########################
 ### BAYESIAN ANALYSIS ###
@@ -146,3 +150,4 @@ write.table(result, file="results_prewhiten_fcut1000Hz_AA.txt", sep=" ", row.nam
 # covpbbBayes(noisydata, postSamples, l=200, p=90, fs=fs, movGmode = 11, 
 #             um = 10, dm = 10, movBand = 5, timeGmode = NULL, 
 #             Obergaunlinguer_data, actPlot =TRUE, fmean = mean(fits_data$f))
+
