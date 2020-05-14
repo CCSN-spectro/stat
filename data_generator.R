@@ -67,13 +67,13 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
   XX = fft(X); # FFT computing and normalization
   XXX = XX*sqrt(psd);                   # Coloring
   Y = fft(XXX, inverse = TRUE);         # FFT inverse
-  Y = Re(Y)/sqrt(fs);                    # noise in time domain
+  Y = Re(Y)/sqrt(fs);                   # noise in time domain
 
   X1 = rnorm(n, mean=0, sd=1);            # Gaussian white noise
   XX1 = fft(X1); # FFT computing and normalization
   XXX1 = XX1*sqrt(psd);                   # Coloring
   Y1 = fft(XXX1, inverse = TRUE);         # FFT inverse
-  Y1 = Re(Y1)/sqrt(fs);                    # noise in time domain
+  Y1 = Re(Y1)/sqrt(fs);                   # noise in time domain
   
   # Signal addition (centered at the middle of the data vector to avoid filtering leakage
   # at the beggining and end).
@@ -295,7 +295,7 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
         a = fft(Y)                        # FFT computing and normalization
         b = a/sqrt(psdwhitening)          # whitening
         c = fft(b, inverse = TRUE);       # FFT inverse
-        YY = s0*Re(c)/n/sqrt(fs)/10;         # Normalisation factor of the 2 FFTs
+        YY = s0/10*Re(c)/n/sqrt(fs);         # Normalisation factor of the 2 FFTs
 
       }
       else 
@@ -336,7 +336,7 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
       T_wvf=seq(ind1,ind1+wvf_size-1,by=1)
       points(T_wvf,(wvf.df$V2)*ampl,col="green",type="l",pch=3);  # signal only
 
-      leg = c("noise", "(noise+signal) HP filtered", "signal only")
+      leg = c("noise", "(noise+signal) filtered", "signal only")
       col = c("black","red","green")
       legend (x=0,y=max(Y)*.9,legend=leg,cex=.8,col=col,pch=c(1,3))
     }
@@ -348,10 +348,10 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
  
     # Output vectors time series
 
-    if (filtering == "HP" || filtering == "spectrum" || filtering == "prewhiten"){
+    if (filtering == "HP" || filtering == "spectrum" || filtering == "prewhiten" || filtering == "AR"){
       plot (Tf, Yf, type="l", col="black")
       points (Tf, YYf, type="l", col="red")
-      legend (x=Tf[1], y=max(Yf)*.9, col=c("black","red"), legend=c("noise+signal", "noise+signal after HP filter"))
+      legend (x=Tf[1], y=max(Yf)*.9, col=c("black","red"), legend=c("noise+signal", "noise+signal after filter"))
     }else{
       plot (Tf, Yf, type="l", col="black")
       legend (x=Tf[1], y=max(Yf)*.9, legend="noise+signal")
@@ -453,13 +453,18 @@ noise_generator = function (fs, duration, filtering, setseed=0, actPlot=TRUE, ve
         a = fft(Y)                        # FFT computing and normalization
         b = a/sqrt(psdwhitening)          # whitening
         c = fft(b, inverse = TRUE);       # FFT inverse
-        YY = s0*Re(c)/n/sqrt(fs);         # Normalisation factor of the 2 FFTs
+        YY = s0/10*Re(c)/n/sqrt(fs);      # Normalisation factor of the 2 FFTs
 
         #    myfilter=butter(n=4,W=10/(fs/2),type="high")
         #    YY=filtfilt(filt=myfilter,x=YY)          
       }
       else 
         if (filtering == "prewhiten"){
+          #fcut=10
+          #filtfilt : zero phase filter (forward& backward)
+          #myfilter=butter(n=4,W=fcut/(fs/2),type="high")
+          #Y=filtfilt(filt=myfilter,x=Y)     
+
           # prewhiten
           myts <- ts(Y, start=0, end=duration, frequency=fs)
           #myts <- ts(Y)
