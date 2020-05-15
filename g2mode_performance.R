@@ -79,7 +79,7 @@ mu4 = "~ f + I(f^3) - 1";
 s1 = "~ f - 1"; 
 s2 = "~ f + I(f^2) - 1";
 
-Xm  = model.matrix(eval(parse(text=eval(parse(text=mu2)))), fits_data);
+Xm  = model.matrix(eval(parse(text=eval(parse(text=mu3)))), fits_data);
 Xs  = model.matrix(eval(parse(text=eval(parse(text=s2)))), fits_data);
 
 fit = lmvar(fits_data$r, X_mu = Xm, X_sigma = Xs, intercept_mu = TRUE);

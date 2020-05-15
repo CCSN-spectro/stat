@@ -557,8 +557,8 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
          
           yaux = c(true_ratios, pred[,2:3]);
 
-          plot(true_time, true_ratios, xlab = "Time",
-               ylab = "Ratio", ylim = c(min(yaux), max(yaux)), xlim=c(0,1.5), type = "n",
+          plot(true_time, true_ratios, xlab = "Time", xlim=c(0,max(data$V1)),
+               ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
                main = paste("Frequency cutoff", j,"-",gm, "gmode"));
           arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
                  length=0.05, col="gray",pch=3);
