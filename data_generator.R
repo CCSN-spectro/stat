@@ -6,11 +6,93 @@ library ("pracma")
 
 
 ########################################################################
+signal_generator = function(name, fs, actPlot=TRUE){
+########################################################################
+  
+  # name: s11.2--LS220--GravA
+  folder="inputs/New_simulations/"
+  
+  if (name=="s20-gw_10kpc16384"){
+    gw_filename = paste(folder, name, ".dat", sep="")
+    truedata_filename=paste(folder, "Ratios/s20_data_g2.dat", sep="")
+  }else{
+    gw_filename = paste(folder, "gw_", name, ".dat", sep="")
+    truedata_filename = paste(folder, "Ratios/", name, "_mass_r.csv", sep="")
+  }
+  
+  metadata_filename = paste(folder,"metadata.csv", sep="")
+  
+  if (actPlot==TRUE){
+    print(gw_filename)
+    print(truedata_filename)
+    print(metadata_filename)
+  }
+  # Signal
+  sXX = read.table(gw_filename); # V1 time, V2 signal
+  colnames(sXX) = c ("time","hoft");
+  duration=length(sXX$time)/16384
+  
+  # True data to define the ratio
+  # For g2 modes, ratio (x variable in TF19) is x = Mpns / Rpns^2 
+  true_data = read.table(truedata_filename, sep = ",", comment.char = "#",header = TRUE);
+  
+  if (name!="s20-gw_10kpc16384"){
+    true_data = cbind(true_data$time, true_data$mass_pns / true_data$r_pns^2);
+  }
+  colnames(true_data) = c ("time", "ratio");
+  true_data = as.data.frame(true_data);
+  
+  # Metadata
+  meda = read.csv(metadata_filename)
+  colnames(meda) = c("name","tb")
+  t_bounce=meda$tb[which(meda$name == name)]
+  
+  if (actPlot==TRUE){
+    print(c("Number of samples at 16384 Hz:", length(sXX$time)))
+    print(c("Waveform duration:", duration, "s"))
+    print(paste(name,"tbounce=", t_bounce," s"))
+  }
+  
+  # shift time such that t_bounce=0
+  sXX$time=sXX$time-t_bounce  
+  true_data$time=true_data$time-t_bounce 
+  
+  # signal sampled at 16384 Hz. Resampling at fs
+  resamp_factor=16384/fs
+  signaly=resample(sXX$hoft,1/16384,1/fs)
+  
+  # decimate time vector
+  signalx=seq(1,(fs*duration),by=1)
+  for (i in 1:(fs*duration)) {
+    signalx[i]=mean(sXX$time[((i-1)*resamp_factor+1):((i-1)*resamp_factor+resamp_factor)])
+  }
+  sYY = data.frame("time"=signalx,"hoft"=signaly)
+  
+  # remove times corresponding to the post-bounce period that is removed (100 ms) for all wvfs
+  t_start=t_bounce+0.100
+  true_data=subset(true_data, true_data$time >= 0.100)
+  sYY=subset(sYY, sYY$time >= 0.100)  
+  
+  if (actPlot == TRUE){
+    plot(sXX$time, sXX$hoft, type="l", xlab="Time after bounce [s]", ylab="h(t)",pch=1)
+    points(sYY$time, sYY$hoft, col="red",pch=2)
+    
+    leg = c("wvf resampled", "first 100ms after bounce removed")
+    col = c("black","red")
+    legend (x=duration*.1,y=max(sXX$hoft)*.9,legend=leg,col=col,pch=c(1,2))
+  }
+  
+  return (list(wvf=sYY, true_data=true_data, duration=duration))
+  
+}
+
+
+########################################################################
 data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlot=TRUE){
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
-  # wvf: dataframe (V1=time, V2=h(t)) that contains the signal waveform sampled at fs
+  # wvf: dataframe (time=time, hoft=h(t)) that contains the signal waveform sampled at fs
   # ampl: multiplication factor to change the source distance
   # fcut: lower frequency cutoff of the high pass filter. If NULL no HP filter.
   # filtering: "HP" --> fcut must be set
@@ -37,7 +119,7 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
   # Prepration in case a signal is added  
   if (length(wvf.df)!=0) {
     wvf_opt=1
-    wvf_size=length(wvf.df$V2)
+    wvf_size=length(wvf.df$hoft)
     if (wvf_size>n){
       print("The waveform length is larger than the requested data vector size. Please check")
       return(NULL)
@@ -49,10 +131,10 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
       n=2*duration*fs
 #    }
 
-    if (wvf_size%%2>0){
-      print("The waveform length should be an even number. Please check")
-      return(NULL)
-    }
+    #if (wvf_size%%2>0){
+    #  print("The waveform length should be an even number. Please check")
+    #  return(NULL)
+    #}
   }
   
   # Noise generation
@@ -78,10 +160,10 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
   # Signal addition (centered at the middle of the data vector to avoid filtering leakage
   # at the beggining and end).
   if (wvf_opt==1){
-    ind1=(n-wvf_size)/2
+    ind1=floor((n-wvf_size)/2.)
     
     for (i in 1:wvf_size){
-      Y[ind1+i]=Y[ind1+i]+ampl*wvf.df$V2[i]
+      Y[ind1+i]=Y[ind1+i]+ampl*wvf.df$hoft[i]
     }
   }
 
@@ -122,7 +204,7 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
   Tf = seq(1, n_0, by = 1)
 
   for (i in 1:n_0){
-    Tf[i]=wvf.df$V1[1]+i/fs
+    Tf[i]=wvf.df$time[1]+i/fs
   }
   
   Yf = seq(1, n_0, by = 1)
@@ -139,7 +221,7 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
       points(T, Y, col="black", type="l", pch=1, panel.first = grid())
       points(T, YY, col="red", type="l", pch=2);                                # (noise + signal) filtered
       T_wvf=seq(ind1,ind1+wvf_size-1,by=1)
-      points(T_wvf,(wvf.df$V2)*ampl,col="green",type="l",pch=3);  # signal only
+      points(T_wvf,(wvf.df$hoft)*ampl,col="green",type="l",pch=3);  # signal only
 
       leg = c("noise", "(noise+signal) HP filtered", "signal only")
       col = c("black","red","green")
@@ -171,7 +253,7 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
 ########################################################################
   # fs: sampling frequency
   # duration: duration (in second) of the output time serie
-  # wvf: dataframe (V1=time, V2=h(t)) that contains the signal waveform sampled at fs
+  # wvf: dataframe (time=time, hoft=h(t)) that contains the signal waveform sampled at fs
   # ampl: multiplication factor to change the source distance
   # fcut: lower frequency cutoff of the high pass filter. If NULL no HP filter.
   # filtering method:
@@ -207,16 +289,16 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
   # Prepration in case a signal is added  
   if (length(wvf.df)!=0) {
     wvf_opt=1
-    wvf_size=length(wvf.df$V2)
+    wvf_size=length(wvf.df$hoft)
     if (wvf_size>n){
       print("The waveform length is larger than the requested data vector size. Please check")
       return(NULL)
     }
 
-    if (wvf_size%%2>0){
-      print("The waveform length should be an even number. Please check")
-      return(NULL)
-    }
+    #if (wvf_size%%2>0){
+    #  print("The waveform length should be an even number. Please check")
+    #  return(NULL)
+    #}
 
     # double the vector size
     duration=2*duration
@@ -246,10 +328,10 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
   # Signal addition (centered at the middle of the data vector to avoid filtering leakage
   # at the beggining and end).
   if (wvf_opt==1){
-    ind1=(n-wvf_size)/2
+    ind1=floor((n-wvf_size)/2)
     
     for (i in 1:wvf_size){
-      Y[ind1+i]=Y[ind1+i]+ampl*wvf.df$V2[i]
+      Y[ind1+i]=Y[ind1+i]+ampl*wvf.df$hoft[i]
     }
   }
 
@@ -317,7 +399,7 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
   Tf = seq(1, n_0, by = 1)
 
   for (i in 1:n_0){
-    Tf[i]=wvf.df$V1[1]+i/fs
+    Tf[i]=wvf.df$time[1]+i/fs
   }
   
   Yf = seq(1, n_0, by = 1)
@@ -334,7 +416,7 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
       points(T, Y, col="black", type="l", pch=1, panel.first = grid())
       points(T, YY, col="red", type="l", pch=2);                                # (noise + signal) filtered
       T_wvf=seq(ind1,ind1+wvf_size-1,by=1)
-      points(T_wvf,(wvf.df$V2)*ampl,col="green",type="l",pch=3);  # signal only
+      points(T_wvf,(wvf.df$hoft)*ampl,col="green",type="l",pch=3);  # signal only
 
       leg = c("noise", "(noise+signal) filtered", "signal only")
       col = c("black","red","green")
@@ -360,8 +442,6 @@ data_generator1 = function (fs, duration, wvf.df, ampl=1, filtering, setseed=0, 
 
   return(list(t=Tf,x=Yf,y=YYf))
   }
-
-  
   
   
 ########################################################################
