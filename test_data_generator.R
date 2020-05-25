@@ -1,4 +1,20 @@
 source("data_generator.R")
+source("signal_generator.R")
+
+# test of signal 
+name="s20-gw_10kpc16384"
+name="s11.2--LS220--GravA"
+name="s15.0--GShen--GravA"
+name="s15.0--LS220--GravA"
+name="s15.0--SFHo--GravA"
+name="s20.0--LS220--GravA"
+name="s25.0--LS220--GravA"
+name="s40.0--LS220"
+fs=4096
+signal = signal_generator(name, fs)
+
+
+# test of noise
 
 fs=4096
 duration=1
