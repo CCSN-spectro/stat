@@ -1,5 +1,4 @@
 source("data_generator.R")
-source("signal_generator.R")
 
 # test of signal 
 name="s20-gw_10kpc16384"
