@@ -1,0 +1,10 @@
+# Name, t_bounce [s]
+s11.2--LS220--GravA,0.134
+s15.0--GShen--GravA,0.254
+s15.0--LS220--GravA,0.242
+s15.0--SFHo--GravA,0.243
+s20.0--LS220--GravA,0.185
+s20_v1,0.180
+s25.0--LS220--GravA,0.398
+s40.0--LS220,0.296
+s20-gw_10kpc16384,0.180
