@@ -376,8 +376,8 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
   
   ### ###
   true_time = thruth_data$time; 
-  true_ratios = thruth_data$x
-  
+  true_ratios = thruth_data$ratio
+
   # spectrogram
   r = specPdgrm(data$V2, data$V1, l=l, p=p, fs=fs, actPlot=actPlot, logPow=TRUE,
                 zoomFreq=c(0,1)); # generating the spectrogram
@@ -557,12 +557,12 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
          
           yaux = c(true_ratios, pred[,2:3]);
 
-          plot(true_time, true_ratios, xlab = "Time", xlim=c(0,max(data$V1)),
+          plot(true_time1, true_ratio1, xlab = "Time", xlim=c(0,max(true_time1)*1.1),
                ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
                main = paste("Frequency cutoff", j,"-",gm, "gmode"));
           arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
                  length=0.05, col="gray",pch=3);
-          points(true_time, true_ratios, col = "black", pch=1);
+          points(true_time1, true_ratio1, col = "black", pch=1);
           points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3, pch=2);
           
           leg <- c("true ratio", "pred ","pred uncertainty");
