@@ -95,8 +95,15 @@ for(i in s){
   }
 }
 
-aic
-bic
+aic = as.data.frame(aic)
+colnames(aic) = c("mu1", "mu2", "mu3", "mu4");
+rownames(aic) = c("s1", "s2");
+bic = as.data.frame(bic)
+colnames(bic) = c("mu1", "mu2", "mu3", "mu4");
+rownames(bic) = c("s1", "s2");
+
+aic; # lower is better
+bic; # lower is better
 
 ### plot ###
 
