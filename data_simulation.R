@@ -282,10 +282,13 @@ noise_generator = function (factor,fs, duration, detector, setseed=0,
 
   X = rnorm(n, mean=0, sd=1);           # Gaussian white noise
   XX = fft(X);                          # FFT computing
-  XXX = XX*sqrt(psd);                   # Coloring
+  XXX = XX*sqrt(psd)*sqrt(fs);          # Coloring
   Y = fft(XXX, inverse = TRUE);         # FFT inverse
-  #Y = Re(Y)*sqrt(fs)/n;                 # noise in time domain
-  Y = Re(Y)/n
+  Y = Re(Y)/n;                          # noise in time domain
+  # Note on the normalisation factor: 
+  #  - n comes from the FFT and FFT inverse (sqrt(n) each)
+  #  - to color properly the noise and keep the amplitude right 
+  #    one needs to multiply by sqrt(psd) x sqrt(fs) 
   
   # filter the time series if requested
   if (filter != FALSE){
@@ -325,17 +328,18 @@ noise_generator = function (factor,fs, duration, detector, setseed=0,
     # Fourier transform
     YFT = sqrt(2)*fft(Y)/sqrt(n);
     WFT = sqrt(2)*fft(YY)/sqrt(n);
-    ymin=10^(ceiling(log10(min(abs(YFT)[1:int(n/2)]))))
-    ymax=10^(ceiling(log10(max(abs(YFT)[1:int(n/2)]))))
-   
-    plot (freq1, abs(YFT)[1:int(n/2)], log="xy", type="l", xlab="Frequency", ylab="ASD", 
+    ymin=10^(ceiling(log10(min(abs(YFT)[1:int(n/2)])/sqrt(fs))))
+    ymax=10^(ceiling(log10(max(abs(YFT)[1:int(n/2)])/sqrt(fs))))
+    #ymin=1e-24
+    #ymax=2e-21
+    plot (freq1, abs(YFT)[1:int(n/2)]/sqrt(fs), log="xy", type="l", xlab="Frequency", ylab="ASD", 
           col="grey", xlim=c(1, fs/2), ylim=c(ymin,ymax), pch=1, panel.first = grid())
 
-    lines(fs*psdest$freq, sqrt(psdest$spec), col="blue", pch=2)
+    lines(fs*psdest$freq, sqrt(psdest$spec)/sqrt(fs), col="blue", pch=2)
    
-    lines(freq1, abs(WFT)[1:int(n/2)], col="black", pch=4)        # factor 2 because FT is 2 sided
+    lines(freq1, abs(WFT)[1:int(n/2)]/sqrt(fs), col="black", pch=4)        # factor 2 because FT is 2 sided
     lines(fs*psdest_filtered$freq[1:int(n/2)],                      # pspectrum is 1 sided
-          sqrt(psdest_filtered$spec[1:int(n/2)]), col="green", pch=5)
+          sqrt(psdest_filtered$spec[1:int(n/2)])/sqrt(fs), col="green", pch=5)
 
     lines(freq1, sqrt(2*psd[1:int(n/2)]), col="red", pch=3)         # PSD is 2 sided PSD
     
