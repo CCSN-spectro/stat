@@ -1,24 +1,29 @@
 source("specPdgrm.R")
-source("data_generator.R")
+source("data_simulation.R")
 source("functions.R")
 
 library(signal)
 
+#detector="CE"
+detector="aLIGO"
+#detector="ET_B"
+#detector="ET_C"
+#detector="ET_D"
+
+name="s20-gw"
+#name="s11.2--LS220"
+#name="s15.0--GShen"
+#name="s15.0--LS220"
+#name="s15.0--SFHo"
+#name="s20.0--LS220"
+#name="s25.0--LS220"
+#name="s40.0--LS220"
+
+
 ##################
 ### parameters ###
 ##################
-#name="s20-gw_10kpc16384"
-#name="s11.2--LS220--GravA"
-#name="s15.0--GShen--GravA"
-name="s15.0--LS220--GravA"
-#name="s15.0--SFHo--GravA"
-#name="s20.0--LS220--GravA"
-#name="s25.0--LS220--GravA"
-#   name="s40.0--LS220"
 
-fs=4096
-ampl=10
-filtering_method="prewhiten"
 
 #############
 ### Model ###
@@ -46,17 +51,6 @@ Xs  = model.matrix(eval(parse(text=eval(parse(text=s2)))), fits_data);
 # Variable variance linear model
 fit = lmvar(fits_data$r, X_mu = Xm, X_sigma = Xs, intercept_mu = TRUE);
 
-#############################
-### Signal and true ratio ###
-#############################
-signal = signal_generator(name, fs)
-
-wvf.df=signal$wvf
-true_data=signal$true_data
-duration=signal$duration
-
-
-
 ############################
 ### FREQUENTIST ANALYSIS ###
 ############################
@@ -64,7 +58,27 @@ duration=signal$duration
 # g-mode estimate: starting from the right, left or median
 #gmode = c("left", "right", "median");
 gmode = c("left");
-#gmode = c("right"); 
+gmode = c("right"); 
+
+#############################
+### Signal and true ratio ###
+#############################
+#name="s20-gw"
+#name="s11.2--LS220"
+#name="s15.0--GShen"
+#name="s15.0--LS220"
+#name="s15.0--SFHo"
+#name="s20.0--LS220"
+#name="s25.0--LS220"
+#name="s40.0--LS220"
+
+fs=4096
+
+signal = signal_generator(fs, name)
+
+wvf=signal$wvf
+true_data=signal$true_data
+duration=signal$duration
 
 ###########
 ### Run ###
@@ -72,32 +86,39 @@ gmode = c("left");
 
 # loop over N generation of noisy data and add signal
 
+filtering_method="prewhiten"
+#detector="CE"
 actplot=TRUE
-N=1
-dist_nb=25
-result<-matrix(nrow=N*dist_nb,ncol=12)
 
+N=1
+dist_nb=100
+result<-matrix(nrow=N*dist_nb,ncol=12)
+# To use always the same random noise
 set.seed(1)
 
 for (j in 1:dist_nb){
-  dist = 1+(j-1)*.25
+  dist = 1+(j-1)
   print(c("distance:",dist,"kpc"))
   for (i in 1:N){
-    d = data_generator1(fs, duration, wvf.df, ampl=10/dist, filtering = filtering_method, actPlot=FALSE);
+    d=data_generator(fs, duration, wvf, ampl=10/dist, detector, 
+                     filter = filtering_method, 
+                     setseed=0, actPlot=FALSE, verbose=FALSE);
     noisydata = data.frame("V1"=d$t,"V2"=d$y);
+    
     out = covpbb(noisydata, mod=mod, l=200, p=90, fs=fs,
-              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(100, 500),
+              um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 500),
               um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
               gmode = gmode,
-              thruth_data=true_data, actPlot=TRUE,
+              thruth_data=true_data, actPlot=FALSE,
               limFreq = c(1000));
 
     out1 = covpbb(noisydata, mod=fit, l=200, p=90, fs=fs,
-               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(100, 500),
+               um_L = 8, dm_L = 0, m_L = 8, initfreq_L = c(-Inf, 500),
                um_R = 0, dm_R = 8, m_R = 8, initfreq_R = c(1000, 1700),
                gmode = gmode,
                thruth_data=true_data, actPlot=TRUE,
                limFreq = c(1000));
+    
     
     result[i+(j-1)*N,1]=out$covpbb[1,1]
     result[i+(j-1)*N,2]=dist
@@ -113,15 +134,14 @@ for (j in 1:dist_nb){
     result[i+(j-1)*N,10]=out1$residual[1,2]
     result[i+(j-1)*N,11]=out1$residual[1,3]
     result[i+(j-1)*N,12]=out1$residual[1,4]
-    print(out1$covpbb)
+
   }
+  print(out1$covpbb[2])    
 }
 
-print(out)
-print(out1)
-
-filename=sprintf("results_%s_fcut1000Hz_AA_%s.txt", filtering_method, name)
+filename=sprintf("results_AA_%s_%s_%s_factor2.txt", filtering_method, name, detector)
 write.table(result, file=filename, sep=" ", row.names=FALSE, col.names=FALSE)
+
 
 #########################
 ### BAYESIAN ANALYSIS ###
