@@ -8,6 +8,9 @@ dist=1
 mc=noise_generator(factor,fs, duration, detector, setseed=1, filter="prewhiten",
                       actPlot=TRUE, verbose=TRUE)
 
+
+
+
 out=signal_generator(fs, "s20-gw", 
                      actPlot=TRUE, verbose=TRUE)
 
