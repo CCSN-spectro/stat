@@ -1,6 +1,6 @@
 library ("seewave");
 library ("signal")
-source ("data_generator.R")
+source ("data_simulation.R")
 library(lmvar)
 
 ########################################################################
@@ -423,7 +423,7 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
 
   if(actPlot == TRUE){
     if(gmode == "left"){
-      points(timefreq, maxfs$maxf_L, col='black')
+      points(timefreq, maxfs$maxf_L, col='black',type="p")
     }else if (gmode == "right"){
       points(timefreq, maxfs$maxf_R, col='black')
       }else{
@@ -556,16 +556,15 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         if(actPlot == TRUE){
          
           yaux = c(true_ratios, pred[,2:3]);
-
-          plot(true_time1, true_ratio1, xlab = "Time", xlim=c(0,max(true_time1)*1.1),
-               ylab = "Ratio", ylim = c(min(yaux), max(yaux)), type = "n",
-               main = paste("Frequency cutoff", j,"-",gm, "gmode"));
+          plot(true_time1, true_ratio1, xlab = "Time", xlim=c(min(true_time1)*.9,max(true_time1)*1.05),
+               ylab = "Ratio", ylim = c(min(yaux), 1.3*max(true_ratio1)), type = "n");
+      #         main = paste("Frequency cutoff", j,"-",gm, "gmode"));
           arrows(timefreq1, pred[,2], timefreq1, pred[,3], code=3, angle=90,
                  length=0.05, col="gray",pch=3);
           points(true_time1, true_ratio1, col = "black", pch=1);
           points(timefreq1, pred[,1], col = "red", cex = pred[,1]/max(pred[,1])+ 0.3, pch=2);
           
-          leg <- c("true ratio", "pred ","pred uncertainty");
+          leg <- c("Simulation", "Estimation ","Uncertainty");
           col <- c("black","red","gray");
           legend("topleft",legend=leg,cex=.8,col=col,pch=c(1,2,3));
           
