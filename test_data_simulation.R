@@ -1,15 +1,16 @@
 source("data_simulation.R")
 
-detector="aLIGO"
+detectors=c("A" ,"B")
+for (i in detectors){
+  print(i)
+}
+detector="KAGRA"
 fs=4096
-duration=2
-factor=1
+duration=1
+factor=2
 dist=1
-mc=noise_generator(factor,fs, duration, detector, setseed=1, filter="prewhiten",
+mc=noise_generator(factor,fs, duration, detector, setseed=0, filter="prewhiten",
                       actPlot=TRUE, verbose=TRUE)
-
-
-
 
 out=signal_generator(fs, "s20-gw", 
                      actPlot=TRUE, verbose=TRUE)

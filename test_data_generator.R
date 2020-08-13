@@ -49,3 +49,9 @@ plot(freq,2*abs(wbFT)[1:int(n/2)], log="y",type="l", xlab="frequency",ylab="ASD"
 dp = data_generator(fs, duration, wvf.df, ampl, filtering="whitening_bis", fcut=fcut, actPlot=TRUE)
 sprintf("noise and signal is high passed. Standard deviation: %g", sqrt(var(dp$y)))
 
+############ test of noise_generator
+fs=4096
+duration=1
+
+data=noise_generator(fs, duration, filtering='HP',setseed=1,actPlot=TRUE, verbose=TRUE)
+

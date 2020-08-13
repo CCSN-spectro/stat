@@ -6,7 +6,7 @@ library ("pracma")
 
 
 ########################################################################
-signal_generator = function(name, fs, actPlot=TRUE){
+signal_generator = function(name, fs, actPlot=TRUE, pbOff=TRUE){
 ########################################################################
   
   # name: s11.2--LS220--GravA
@@ -69,13 +69,17 @@ signal_generator = function(name, fs, actPlot=TRUE){
   sYY = data.frame("time"=signalx,"hoft"=signaly)
   
   # remove times corresponding to the post-bounce period that is removed (100 ms) for all wvfs
-  t_start=t_bounce+0.100
-  true_data=subset(true_data, true_data$time >= 0.100)
-  sYY=subset(sYY, sYY$time >= 0.100)  
+  if (pbOff==TRUE){
+    t_start=t_bounce+0.100
+    true_data=subset(true_data, true_data$time >= 0.100)
+    sYY=subset(sYY, sYY$time >= 0.100)  
+  }
   
   if (actPlot == TRUE){
-    plot(sXX$time, sXX$hoft, type="l", xlab="Time after bounce [s]", ylab="h(t)",pch=1)
+    plot(sXX$time, sXX$hoft, type="l", xlab="Time after bounce [s]", ylab="h(t)",, xlim=c(0,duration),pch=1)
     points(sYY$time, sYY$hoft, col="red",pch=2)
+    grid(nx = NULL, ny = NULL, col = "lightgray", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+    title(name)
     
     leg = c("wvf resampled", "first 100ms after bounce removed")
     col = c("black","red")
@@ -106,13 +110,14 @@ data_generator = function (fs, duration, wvf.df, ampl=1, filtering, fcut, actPlo
   
   
   # check that duration is an integer > 0
-
   if ((duration%%1)>0){
     print("duration must be a positive integer")
     return()
   }
  
-  n=duration*fs 
+  n=duration*fs
+  
+ 
   n_0=n
   wvf_opt=0
   print(length(wvf.df))
@@ -466,7 +471,7 @@ noise_generator = function (fs, duration, filtering, setseed=0, actPlot=TRUE, ve
     return()
   }
   
-  n=duration*fs 
+  n=20*duration*fs 
   if (verbose==TRUE){print(c("Size of the vectors: ", n))}
   
   # Noise generation
@@ -474,6 +479,8 @@ noise_generator = function (fs, duration, filtering, setseed=0, actPlot=TRUE, ve
   freq2[1]=0.001                 # to avoid plotting pb in logscale
   freq1=freq2[1:int(n/2)]        # one-sided frequency vector
   psd=aLIGO_PSD_new(freq2,2)     # two-sided PSD          
+  
+  #psd=PSD_3G(freq2,2,'ET_B',verbose)
 
   # compute noise sigma
   s0 <- sqrt(2*trapz(freq1,psd[1:int(n/2)]))
@@ -717,12 +724,15 @@ aLIGO_PSD_new = function(f,type){
       if(output[i]>cutoff){
         output[i]=cutoff
       }
-      if(i>0){
-        output[fn-i]=output[i]
+
+      # Wraparound frequency: f=0 is the first element (i=1), 
+      # and all elements are symetric around index fn/2+1
+      if(i>1){
+        output[fn+2-i]=output[i]
       }
     }  
     output=output/2;            # Two sided PSD
-    output=shifter(output,-1)   # Wraparound frequency: f=0 must be the last element
+#    output=shifter(output,-1)  # No more needed after correction 4 lines above
   }
   return(output);
 }
@@ -730,3 +740,118 @@ aLIGO_PSD_new = function(f,type){
 shifter = function(x, n = 1) {
   if (n == 0) x else c(tail(x, -n), head(x, n))
 }    
+
+########################################################################
+PSD_3G = function(f,type,detector,verbose=FALSE){
+  ########################################################################
+  # 3G sensitivity curves ref:
+  # f: frequency vector
+  # type=1 --> one-sided PSD.
+  # type=2 --> two-sided PSD.
+  # detector: name of the 3G detector
+  
+  psd_filename = sprintf("PSD/%s_data.txt", detector)
+  #psd_filename = sprintf("PSD/%s_sensitivity.txt", detector)
+  data = read.table(psd_filename);
+  fs=4096
+  cutoff=1e-42
+  
+  n = length(f)  
+  fmin=f[1]
+  if (type==1){
+    fmax=f[n]
+  } else{
+    fmax=abs(f[n/2+1])}
+
+  yl=data$V2[1]
+  yr=data$V2[length(data$V2)]
+  
+  asd_func = approxfun(x = data$V1, y = data$V2, method = "linear",
+                yleft=yl, yright=yr, rule = 1, f = 0, ties = "mean");
+  
+  if (type==1){
+    asd = asd_func(f)
+    psd = asd*asd
+  }else{
+    asd = rep(0, n);
+    asd_1sided = asd_func(abs(f[1:int(n/2)]))
+  
+    if (length(asd_1sided) != int(n/2)){
+      print ("Warning: ASD size is different from what is expected")
+    }
+    
+    for(i in 1:(int(n/2))){ 
+      asd[i]=asd_1sided[i];
+      
+      # Wraparound frequency: f=0 is the first element (i=1), 
+      # and all elements are symetric around index n/2+1
+      if(i>1){
+        asd[n+2-i]=asd[i]
+      }
+    }  
+    asd[n/2+1]=asd_func(abs(f[int(n/2)+1]))
+
+    # Two sided psd
+    asd=asd/2;
+    psd=asd*asd;
+  }
+  
+  for (i in 1:n){
+    if (psd[i]>cutoff){
+      psd[i]=cutoff
+    }
+  }
+  
+  if (verbose==TRUE){
+    if (type==1){
+      plot(f,psd,log="xy",col="blue",xlim=c(1, fs/2),pch=2)
+      points(data$V1,data$V2*data$V2,col="red",type="l",pch=1)
+    }else{
+      plot(f,psd,log="y",col="blue",xlim=c(1, fs/2),pch=2)
+      points(data$V1,0.25*data$V2*data$V2,col="red",type="l",pch=1)
+    }
+    leg = c(detector,"interpolated")
+    col = c("red","blue")
+    legend (x=500,y=psd[1]*0.8,legend=leg,cex=.8,col=col,pch=c(1,2))
+  }
+  
+
+  return(psd)
+}
+
+########################################################################
+compute_SNR = function(name, fcut){
+########################################################################
+  fs=4096
+  signal=signal_generator(name, fs, actPlot=TRUE, pbOff=TRUE)
+
+  n=length(signal$wvf$hoft)
+  n2=2*fs*signal$duration        # zeropadding
+
+  #print(c(n,n2))
+  
+  freq2 = fs*fftfreq(n2)         # two-sided frequency vector
+  freq2[1]=0.001                 # to avoid plotting pb in logscale
+  freq1=freq2[1:int(n2/2)]       # one-sided frequency vector
+  psd=aLIGO_PSD_new(freq1,1)     # one-sided PSD          
+
+  waveform=signal$wvf
+  vec=rep(0,n2)
+  for (i in 1:n){
+    vec[n2/4+i]=vec[n2/4+i]+waveform$hoft[i]
+  }  
+  #w=hanning(n2)
+  #vec=waveform$hoft
+  
+  hf=fft(vec);
+  hf=hf[1:(n2/2)]
+  
+  hf=subset(hf,freq1-fcut<0)
+  psd=subset(psd,freq1-fcut<0)
+  freq1=subset(freq1, freq1-fcut<0)
+  
+  integrand=abs(hf*Conj(hf))/(fs*fs)
+  snr=sqrt(4*trapz(freq1,integrand/psd))
+  
+  print(c(name,"SNR:",snr))
+}

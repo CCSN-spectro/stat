@@ -160,7 +160,7 @@ signal_generator = function (fs, signal, pbOff=TRUE,
   gw_filename=paste(folder,meda$wvf_name[index],sep="")
   truedata_filename=paste(folder,"Ratios/",meda$truedata_name[index],sep="")
   t_bounce=meda$tb[index]
-  print(gw_filename)
+  
   if (verbose==TRUE){
     print(gw_filename) 
     print(truedata_filename)
@@ -595,40 +595,59 @@ PSD_fromfiles=function(f, type, detector, verbose=FALSE){
   # type=2 --> two-sided PSD.
   # detector: name of the detector
   
-  
-  psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
-  data=read.table(psd_filename);
 
   cutoff=1e-42            # For 2nd generator detectors
 
   # depending on the detector, the ASD is located in different columns of the data vector
-  if (detector=="CE"){
+  if (detector=="CE1"){
     psd_filename="PSD/curves_Jan_2020/ce1.txt"
+    data=read.table(psd_filename);
+    sens=data$V2        
+    cutoff=1e-44}   
+  
+  if (detector=="CE2"){
+    psd_filename="PSD/curves_Jan_2020/ce2.txt"
     data=read.table(psd_filename);
     sens=data$V2        
     cutoff=1e-44}   
 
   if (detector=="ET_B"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+    data=read.table(psd_filename);
     sens=data$V2
     cutoff=1e-44}
   
   if (detector=="ET_C"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+    data=read.table(psd_filename);
     sens=data$V2
     cutoff=1e-44}
   
   if (detector=="ET_D"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+    data=read.table(psd_filename);
     sens=data$V4   # HF + LF
     cutoff=1e-44}
   
   if (detector=="ADV"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+    data=read.table(psd_filename);
     sens=data$V8}   # BNS optimised
   
   if (detector=="ALIGO"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+    data=read.table(psd_filename);
     sens=data$V7}   # BNS optimised
   
   if (detector=="KAGRA"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+    data=read.table(psd_filename);
     sens=data$V6}
     
+  if (exists("sens")==FALSE){
+    stop(sprintf("Detector %s is not implemented in this code. You may want to use CE1, CE2, ET_B, ET_C, ET_D, aLIGO, ADV, KAGRA or ALIGO",detector))
+  }
+  
   n = length(f)
   fmin=f[1]
   if (type==1){
