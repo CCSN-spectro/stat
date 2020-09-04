@@ -620,11 +620,9 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
       
     } # end loop
     
-    # colnames      
-    out1 = cbind(limFreq, out1);
-    out2 = cbind(limFreq, out2);
-    colnames(out1) = c("limFreq", "covpbb", "medBandWidth");
-    colnames(out2) = c("limFreq", "absres", "MSE", "precision");
+    # colnames
+    colnames(out1) = c("covpbb", "medBandWidth");
+    colnames(out2) = c("absres", "MSE", "precision");
 
     
 

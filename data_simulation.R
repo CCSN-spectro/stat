@@ -175,7 +175,7 @@ signal_generator = function (fs, signal, pbOff=TRUE,
   # For g2 modes, ratio (x variable in TF19) is x = Mpns / Rpns^2 
   true_data = read.table(truedata_filename, sep = ",", comment.char = "#",header = TRUE);
   
-  if (signal != "s20-gw"){
+  if (signal != "s20.0--SFHo"){
     true_data = cbind(true_data$time, true_data$mass_pns / true_data$r_pns^2);
   }
 
@@ -714,16 +714,14 @@ PSD_fromfiles=function(f, type, detector, verbose=FALSE){
 }
 
 ########################################################################
-compute_SNR = function(name, detector, fcut){
+compute_SNR = function(name, detector, fcut=0, dist=10){
 ########################################################################
   fs=4096
-  signal=signal_generator(fs, name, actPlot=TRUE, verbose=FALSE, pbOff=FALSE)
+  signal=signal_generator(fs, name, actPlot=FALSE, verbose=FALSE, pbOff=FALSE)
   waveform=signal$wvf
   
   n=length(waveform$hoft)
-  n2=10*n            # zero padding
-  
-  print(c(n,n2))
+  n2=10*n                        # zero padding
   
   freq2 = fs*fftfreq(n2)         # two-sided frequency vector
   freq2[1]=0.001                 # to avoid plotting pb in logscale
@@ -738,28 +736,26 @@ compute_SNR = function(name, detector, fcut){
   
   vec=rep(0,n2)
   for (i in 1:n){
-    vec[n2/4+i]=vec[n2/4+i]+waveform$hoft[i]
+    vec[n2/4+i]=vec[n2/4+i]+waveform$hoft[i]*10./dist
   }  
-  #w=hanning(n2)
-  #vec=waveform$hoft
   
-  hf=fft(vec)/n;                 # normalisation wrt the wvf vector size
+  hf=fft(vec)/sqrt(n);                 # normalisation wrt the wvf vector size
 
-  hf=sqrt(2)*hf[1:(n2/2)]        # 2 sided --> 1 sided
+  hf=sqrt(2)*hf[1:(n2/2)]              # 2 sided --> 1 sided
   
   hf=subset(hf,freq1-fcut>0)
   psd=subset(psd,freq1-fcut>0)
   freq1=subset(freq1, freq1-fcut>0)
 
   integrand=abs(hf*Conj(hf))
-  p=integrand/psd
+  p=integrand/psd/fs
   
   snr=sqrt(4*trapz(freq1,p))
   
   print(c(name,"SNR:",snr))
   
   plot (freq1, sqrt(freq1)*abs(hf), log="xy", type="l", xlab="Frequency", ylab="hchar", 
-        col="grey", xlim=c(1, fs/2), ylim=c(1e-25,1e-21), pch=1, panel.first = grid())
+        col="grey", xlim=c(1, fs/2), ylim=c(1e-24,1e-20), pch=1, panel.first = grid())
   points(freq1,sqrt(psd), type="l", col="black",pch=2)
   leg = c("sqrt(f) x h~(f)", "ASD")
   col = c("grey","black")

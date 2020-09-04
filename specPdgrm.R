@@ -222,8 +222,8 @@ specPdgrm = function(data, time = NULL, l, p, fs = NULL, actPlot = TRUE,
       }
     }
     
-    image.plot(x, y, z, xlab = "Time [ms]", ylab = "Frequency [Hz]", 
-               main = paste(main)); # yaxt='n'
+    image.plot(x, y, z, xlab = "Time [ms]", ylab = "Frequency [Hz]") 
+#               main = paste(main)); # yaxt='n'
   }
   
   return(list(x = x, y = y, z = z));
