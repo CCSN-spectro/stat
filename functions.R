@@ -412,13 +412,13 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
     timefreq = timefreq[out];
     
     r$x = r$x[out];
-    r$z = r$z[out, ];
+    r$z = r$z[out, ]; # row=time, col=freq
   }
   
   maxfs = findGmodes(r, um_R, dm_R, um_L, dm_L, m_R, m_L, 
                      initfreq_R, initfreq_L, testSlope = FALSE);
   
-  maxfs = sapply(maxfs,function(x)movf(x, n=movGmode, median));# smoothing g-mode estimates
+  maxfs = sapply(maxfs,function(x)movf(x, n=movGmode, mean));# smoothing g-mode estimates
   maxfs = as.data.frame(maxfs);
 
   if(actPlot == TRUE){

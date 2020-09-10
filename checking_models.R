@@ -5,8 +5,10 @@
 ### Model ###
 #############
 
-fits_data = read.table("fits_data.dat", sep = ",");# data to generate model
-colnames(fits_data) = c("f", "r");
+fits_data = read.table("inputs/A-A_fits_data_g2.dat", sep = ",");# data to generate model
+#fits_data = read.table("inputs/CoCo_fits_data_g2.dat", sep = ",");# data to generate model
+#fits_data = read.table("inputs/fits_data.dat", sep = ",");# data to generate model
+colnames(fits_data) = c("r", "f");
 
 #mod = lm(r~ 0 + f + I(f^2) + I(f^3), data = fits_data); # first model
 #summary(mod);
@@ -129,5 +131,9 @@ Xs  = model.matrix(eval(parse(text=s2)), fits_data);
 
 fit = lmvar(fits_data$r, X_mu = Xm, X_sigma = Xs, intercept_mu = TRUE);
 
-aic[count_i, count_j] = AIC(fit);
-bic[count_i, count_j] = BIC(fit);
+aic[count_i, count_j]; AIC(fit);
+bic[count_i, count_j]; BIC(fit);
+
+
+
+

@@ -149,7 +149,7 @@ specPdgrm = function(data, time = NULL, l, p, fs = NULL, actPlot = TRUE,
       
     }else if(method == "ar"){
       
-      aux = spectrum(auxdata, method = "ar", plot = FALSE)$spec;
+      aux = stats::spectrum(auxdata, method = "ar", plot = FALSE)$spec;
       
       #aux = spectrum(auxdata, method = "ar", plot = FALSE);
       #print(aux$method) # Print order of the AR model
