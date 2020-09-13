@@ -40,21 +40,19 @@ gmode = c("left");
 #############################
 ### Simulation parameters ###
 #############################
-#detectors=c("aLIGO", "ALIGO", "CE1", "CE2", "ET_B", "ET_C", "ET_D")
-signals=c("s20.0--SFHo", "s11.2--LS220", "s15.0--GShen", "s15.0--LS220", 
-          "s15.0--SFHo", "s20.0--LS220", "s25.0--LS220", "s40.0--LS220")
-detectors=c("aLIGO", "CE1", "CE2", "ET_B", "ET_C", "ET_D")
+detectors=c("aLIGO", "ALIGO", "CE1", "CE2", "ET_B", "ET_C", "ET_D")
+signals=c("s11.2--LS220", "s15.0--GShen", "s15.0--LS220", "s15.0--SFHo", 
+          "s20.0--LS220", "s20.0--SFHo", "s25.0--LS220", "s40.0--LS220")
 freq_min=c(200,200,200,200,200,200,200,200)
-distance_step=c(.5,3,3,3,3,3)
-signals=c("s20.0--SFHo")
-detectors=c("aLIGO")
+distance_step=c(0.5,0.5,4,4,4,4,4)
+
 fs=4096
 filtering_method="prewhiten"
 
 # loop over N generation of noisy data and add signal
 
 N=100
-dist_nb=38
+dist_nb=60
 result<-matrix(nrow=N*dist_nb,ncol=6)
 
 isig=0
@@ -91,12 +89,13 @@ for (signal_name in signals){
         result[i+(j-1)*N,6]=out$residual[1,3]
         
       }
-      #print(out1$covpbb[2])
+      #print(out$covpbb[1])
       ind1=1+(j-1)*N
       ind2=N+(j-1)*N
       print(sprintf("%s and signal %s @ distance: %f kpc. Covpbb mean:%f. Covpbb median: %f",
                     detector, signal_name, dist, mean(result[ind1:ind2,2]), median(result[ind1:ind2,2])))
     }
+
     filename=sprintf("results_AA_%s_f2_%s_%s.txt", filtering_method, signal_name, detector)
     write.table(result, file=filename, sep=" ", row.names=FALSE, col.names=FALSE)
   }
