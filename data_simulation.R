@@ -270,7 +270,7 @@ noise_generator = function (factor,fs, duration, detector, setseed=0,
   freq1=freq2[1:int(n/2)]        # one-sided frequency vector
   
   # Get the 2 sided PSD
-  if (detector == "aLIGO"){
+  if (detector == "ALIGO"){
     psd=aLIGO_PSD_new(freq2, 2)
     }else{
     psd=PSD_fromfiles(freq2, 2, detector, verbose)
@@ -632,12 +632,12 @@ PSD_fromfiles=function(f, type, detector, verbose=FALSE){
   if (detector=="ADV"){
     psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
     data=read.table(psd_filename);
-    sens=data$V8}   # BNS optimised
+    sens=data$V7}   # Design
   
-  if (detector=="ALIGO"){
-    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+  if (detector=="aLIGO"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", toupper(detector))
     data=read.table(psd_filename);
-    sens=data$V7}   # BNS optimised
+    sens=data$V6}   # Design
   
   if (detector=="KAGRA"){
     psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
@@ -741,7 +741,7 @@ compute_SNR = function(name, detector, fcut=0, dist=10){
   
   hf=fft(vec)/sqrt(n);                 # normalisation wrt the wvf vector size
 
-  hf=sqrt(2)*hf[1:(n2/2)]              # 2 sided --> 1 sided
+  hf=hf[1:(n2/2)]                      # The integral is performed over positive freqs
   
   hf=subset(hf,freq1-fcut>0)
   psd=subset(psd,freq1-fcut>0)
@@ -752,7 +752,7 @@ compute_SNR = function(name, detector, fcut=0, dist=10){
   
   snr=sqrt(4*trapz(freq1,p))
   
-  print(c(name,"SNR:",snr))
+  #print(c(name,"SNR:",snr))
   
   plot (freq1, sqrt(freq1)*abs(hf), log="xy", type="l", xlab="Frequency", ylab="hchar", 
         col="grey", xlim=c(1, fs/2), ylim=c(1e-24,1e-20), pch=1, panel.first = grid())
@@ -760,7 +760,9 @@ compute_SNR = function(name, detector, fcut=0, dist=10){
   leg = c("sqrt(f) x h~(f)", "ASD")
   col = c("grey","black")
   legend (x=1,y=6e-22,legend=leg,cex=.8,col=col,pch=c(1,2))
-}
+
+  return(snr)  
+  }
 
 ########################################################################
 aLIGO_PSD_new2 = function(f,type){
