@@ -45,6 +45,8 @@ signals=c("s11.2--LS220", "s15.0--GShen", "s15.0--LS220", "s15.0--SFHo",
           "s20.0--LS220", "s20.0--SFHo", "s25.0--LS220", "s40.0--LS220")
 freq_min=c(200,200,200,200,200,200,200,200)
 distance_step=c(0.5,0.5,4,4,4,4,4)
+distance_step_2G=0.5
+distance_step_3G=c(4,7.5,7,5,5,4,5,8)
 
 fs=4096
 filtering_method="prewhiten"
@@ -67,8 +69,14 @@ for (signal_name in signals){
     # To use always the same random noise for all waveforms % detectors
     set.seed(1)  
     idet=idet+1
+
+    if (detector == "aLIGO" || detector == "ALIGO"){
+      distance_step=distance_step_2G}
+    else{
+      distance_step=distance_step_3G[isig]}
+
     for (j in 1:dist_nb){
-      dist = 1+(j-1)*distance_step[idet]
+      dist = 1+(j-1)*distance_step
       for (i in 1:N){
         d=data_generator(fs, duration, wvf, ampl=10/dist, detector, 
                    filter = filtering_method, 
