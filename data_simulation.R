@@ -193,14 +193,19 @@ signal_generator = function (fs, signal, pbOff=TRUE,
   true_data$time=true_data$time - t_bounce 
   
   # signal sampled at 16384 Hz. Resampling at fs
-  resamp_factor=fs_orig/fs
-  signaly=resample(sXX$hoft, 1./fs_orig, 1./fs)
-  
-  # decimate time vector
-  signalx=seq(1,(fs*duration),by=1)
-  for (i in 1:(fs*duration)) {
-    signalx[i]=mean(sXX$time[((i-1)*resamp_factor+1):((i-1)*resamp_factor+resamp_factor)])
-  }
+  if (fs != fs_orig){
+    resamp_factor=fs_orig/fs
+    signaly=resample(sXX$hoft, 1./fs_orig, 1./fs)
+    # decimate time vector
+    signalx=seq(1,(fs*duration),by=1)
+    for (i in 1:(fs*duration)) {
+      signalx[i]=mean(sXX$time[((i-1)*resamp_factor+1):((i-1)*resamp_factor+resamp_factor)])
+    }
+  }else{
+    resamp_factor=1
+    signaly=sXX$hoft
+    signalx=sXX$time}
+    
   sYY = data.frame("time"=signalx,"hoft"=signaly)
   
   # remove times corresponding to the post-bounce period that is removed (100 ms) for all wvfs
@@ -227,7 +232,7 @@ signal_generator = function (fs, signal, pbOff=TRUE,
   
   return (list(wvf=sYY, true_data=true_data, duration=duration))
   
-  }
+}
 
 ########################################################################
 noise_generator = function (factor,fs, duration, detector, setseed=0,
@@ -270,7 +275,7 @@ noise_generator = function (factor,fs, duration, detector, setseed=0,
   freq1=freq2[1:int(n/2)]        # one-sided frequency vector
   
   # Get the 2 sided PSD
-  if (detector == "aLIGO"){
+  if (detector == "ALIGO"){
     psd=aLIGO_PSD_new(freq2, 2)
     }else{
     psd=PSD_fromfiles(freq2, 2, detector, verbose)
@@ -583,7 +588,7 @@ aLIGO_PSD_new = function(f,type){
 
 shifter = function(x, n = 1) {
   if (n == 0) x else c(tail(x, -n), head(x, n))
-}    
+}
 
 ########################################################################
 PSD_fromfiles=function(f, type, detector, verbose=FALSE){
@@ -595,7 +600,6 @@ PSD_fromfiles=function(f, type, detector, verbose=FALSE){
   # type=2 --> two-sided PSD.
   # detector: name of the detector
   
-
   cutoff=1e-42            # For 2nd generator detectors
 
   # depending on the detector, the ASD is located in different columns of the data vector
@@ -632,12 +636,18 @@ PSD_fromfiles=function(f, type, detector, verbose=FALSE){
   if (detector=="ADV"){
     psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
     data=read.table(psd_filename);
-    sens=data$V8}   # BNS optimised
+    sens=data$V7}   # Design
   
-  if (detector=="ALIGO"){
-    psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
+  if (detector=="aLIGO"){
+    psd_filename=sprintf("PSD/%s_sensitivity.txt", toupper(detector))
     data=read.table(psd_filename);
-    sens=data$V7}   # BNS optimised
+    sens=data$V6}   # Design
+  
+  if (detector=="aLIGO2"){
+    psd_filename="PSD/aLIGODesign.txt"
+    data=read.table(psd_filename);
+    sens=data$V2}   # Design  
+  
   
   if (detector=="KAGRA"){
     psd_filename=sprintf("PSD/%s_sensitivity.txt", detector)
@@ -709,26 +719,33 @@ PSD_fromfiles=function(f, type, detector, verbose=FALSE){
     legend (x=500,y=psd[1]*0.8,legend=leg,cex=.8,col=col,pch=c(1,2))
   }
   
-
   return(psd)
 }
 
 ########################################################################
-compute_SNR = function(name, detector, fcut=0, dist=10){
+compute_SNR = function(name, detector, fcut=0, dist=10, pbOff=FALSE){
 ########################################################################
-  fs=4096
-  signal=signal_generator(fs, name, actPlot=FALSE, verbose=FALSE, pbOff=FALSE)
+  fs=16384
+  signal=signal_generator(fs, name, pbOff=FALSE, actPlot=TRUE, verbose=FALSE)
   waveform=signal$wvf
   
   n=length(waveform$hoft)
-  n2=10*n                        # zero padding
+  a = nextpow2(10*n)         #zero padding and rounding to the next power of 2
+  n2=2^a
+
+  # Remove or not 0.100s after the bounce (set hoft values to 0)
+  if (pbOff == TRUE){
+    ext=which(waveform$time<0.1)
+    waveform$hoft[ext]=0
+  }
+  
   
   freq2 = fs*fftfreq(n2)         # two-sided frequency vector
   freq2[1]=0.001                 # to avoid plotting pb in logscale
   freq1=freq2[1:int(n2/2)]       # one-sided frequency vector
 
   # Get the 1 sided PSD
-  if (detector == "aLIGO"){
+  if (detector == "ALIGO"){
     psd=aLIGO_PSD_new(freq1, 1)
   }else{
     psd=PSD_fromfiles(freq1, 1, detector)
@@ -739,9 +756,9 @@ compute_SNR = function(name, detector, fcut=0, dist=10){
     vec[n2/4+i]=vec[n2/4+i]+waveform$hoft[i]*10./dist
   }  
   
-  hf=fft(vec)/sqrt(n);                 # normalisation wrt the wvf vector size
+  hf=fft(vec)/sqrt(fs);                   # normalisation wrt the sampling
 
-  hf=sqrt(2)*hf[1:(n2/2)]              # 2 sided --> 1 sided
+  hf=hf[1:(n2/2)]                # The integral is performed over positive freqs
   
   hf=subset(hf,freq1-fcut>0)
   psd=subset(psd,freq1-fcut>0)
@@ -752,7 +769,7 @@ compute_SNR = function(name, detector, fcut=0, dist=10){
   
   snr=sqrt(4*trapz(freq1,p))
   
-  print(c(name,"SNR:",snr))
+  #print(c(name,"SNR:",snr))
   
   plot (freq1, sqrt(freq1)*abs(hf), log="xy", type="l", xlab="Frequency", ylab="hchar", 
         col="grey", xlim=c(1, fs/2), ylim=c(1e-24,1e-20), pch=1, panel.first = grid())
@@ -760,14 +777,16 @@ compute_SNR = function(name, detector, fcut=0, dist=10){
   leg = c("sqrt(f) x h~(f)", "ASD")
   col = c("grey","black")
   legend (x=1,y=6e-22,legend=leg,cex=.8,col=col,pch=c(1,2))
-}
+  title(c(name,"SNR:",snr))
+  return(snr)  
+  }
 
 ########################################################################
 aLIGO_PSD_new2 = function(f,type){
-  ########################################################################
-  # aLIGO sensitivity curve: fit the data point from https://dcc.ligo.org/LIGO-T1800044/public
-  # Type=1 --> one-sided PSD.
-  # Type=2 --> two-sided PSD. 
+########################################################################
+# aLIGO sensitivity curve: fit the data point from https://dcc.ligo.org/LIGO-T1800044/public
+# Type=1 --> one-sided PSD.
+# Type=2 --> two-sided PSD. 
   
   S1 = 5.0e-26;
   S2 = 1.0e-40;
@@ -807,6 +826,3 @@ aLIGO_PSD_new2 = function(f,type){
   return(output);
 }
 
-shifter = function(x, n = 1) {
-  if (n == 0) x else c(tail(x, -n), head(x, n))
-}    

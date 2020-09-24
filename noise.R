@@ -41,12 +41,9 @@ gmode = c("left");
 ### Simulation parameters ###
 #############################
 detectors=c("aLIGO", "ALIGO", "CE1", "CE2", "ET_B", "ET_C", "ET_D")
-signals=c("s11.2--LS220", "s15.0--GShen", "s15.0--LS220", "s15.0--SFHo", 
-          "s20.0--LS220", "s20.0--SFHo", "s25.0--LS220", "s40.0--LS220")
-freq_min=c(200,200,200,200,200,200,200,200)
-distance_step=c(0.5,0.5,4,4,4,4,4)
-distance_step_2G=0.5
-distance_step_3G=c(4,7.5,7,5,5,4,5,8)
+signals="s25.0--LS220"
+freq_min=c(200)
+distance_step=c(.5,.5,4,4,4,4,4)
 
 fs=4096
 filtering_method="prewhiten"
@@ -54,7 +51,7 @@ filtering_method="prewhiten"
 # loop over N generation of noisy data and add signal
 
 N=100
-dist_nb=60
+dist_nb=1
 result<-matrix(nrow=N*dist_nb,ncol=6)
 
 isig=0
@@ -69,14 +66,8 @@ for (signal_name in signals){
     # To use always the same random noise for all waveforms % detectors
     set.seed(1)  
     idet=idet+1
-
-    if (detector == "aLIGO" || detector == "ALIGO"){
-      distance_step=distance_step_2G}
-    else{
-      distance_step=distance_step_3G[isig]}
-
     for (j in 1:dist_nb){
-      dist = 1+(j-1)*distance_step
+      dist = 1e6*(1+(j-1)*distance_step[idet])
       for (i in 1:N){
         d=data_generator(fs, duration, wvf, ampl=10/dist, detector, 
                    filter = filtering_method, 
@@ -104,7 +95,7 @@ for (signal_name in signals){
                     detector, signal_name, dist, mean(result[ind1:ind2,2]), median(result[ind1:ind2,2])))
     }
 
-    filename=sprintf("results_AA_%s_f2_%s_%s.txt", filtering_method, signal_name, detector)
+    filename=sprintf("results_AA_%s_f2_noise_%s.txt", filtering_method, detector)
     write.table(result, file=filename, sep=" ", row.names=FALSE, col.names=FALSE)
   }
 }
