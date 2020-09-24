@@ -539,13 +539,13 @@ covpbb = function(data, mod, l=200, p=90, fs=16384, movGmode = 11,
         ### generating band function ### 
         
         # interpolating lower bound for predicted values
-        fd = approxfun(x = timefreq1, y = movf(pred[,2],n=movBand,median), method = "linear",
+        fd = approxfun(x = timefreq1, y = movf(pred[,2],n=movBand,mean), method = "linear",
                        yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
         # interpolating upper bound for predicted values
-        fu = approxfun(x = timefreq1, y = movf(pred[,3],n=movBand,median), method = "linear",
+        fu = approxfun(x = timefreq1, y = movf(pred[,3],n=movBand,mean), method = "linear",
                        yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
         # interpolating point estimates
-        fm = approxfun(x = timefreq1, y = movf(pred[,1],n=movBand,median), method = "linear",
+        fm = approxfun(x = timefreq1, y = movf(pred[,1],n=movBand,mean), method = "linear",
                        yleft = NA, yright = NA, rule = 1, f = 0, ties = "mean");
         
         # fd & fu use smooth confidence intervals by using "movf"
